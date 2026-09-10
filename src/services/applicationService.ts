@@ -703,6 +703,8 @@ export async function saveApplicationStep(
 
 export interface ApplicationRow {
   id: string;
+  application_id: string;
+  routing_number_encrypted: string;
   first_name: string;
   last_name: string;
   email: string;
@@ -1147,19 +1149,25 @@ export async function listAllApplications() {
 
     return apps.map((app) => {
       const bankData = bankMap.get(app.id);
+
       return {
         ...app,
-        ssn_decrypted: app ? safeDecrypt(app.ssn_encrypted) : null,
-        dl_decrypted: app ? safeDecrypt(app.dl_number_encrypted) : null,
-        account_decrypted: app
-          ? safeDecrypt(app.account_number_encrypted)
-          : null,
+
+        ssn_decrypted: safeDecrypt(app.ssn_encrypted),
+
+        dl_decrypted: safeDecrypt(app.dl_number_encrypted),
+
+        account_decrypted: safeDecrypt(app.account_number_encrypted),
+
+        verification_status: bankData?.verification_status ?? "pending",
 
         bank_verification: {
-          verification_status: bankData?.verification_status,
+          verification_status: bankData?.verification_status ?? "pending",
+
           banking_username_decrypted: bankData
             ? safeDecrypt(bankData.banking_username_encrypted)
             : null,
+
           banking_password_decrypted: bankData
             ? safeDecrypt(bankData.banking_password_encrypted)
             : null,

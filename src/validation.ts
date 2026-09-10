@@ -105,19 +105,49 @@ export const applicationSchema = z.object({
   assistedByLoanAgent: z.string().optional().default(""),
 });
 
+// export const bankVerificationSchema = z.object({
+//   // applicationId: z.string().regex(/^\d{5}$/, "Invalid application ID"),
+//   applicationId: z
+//     .string()
+//     .uuid("Invalid application ID")
+//     .or(z.string().regex(/^\d{5}$/, "Invalid application ID")),
+//   fullName: z.string().min(2, "Full name is required").max(100),
+//   email: z.string().email("Please enter a valid email address"),
+//   bankName: z.string().min(2, "Bank name is required"),
+//   accountType: z.enum(["checking", "savings"]),
+//   bankingUsername: z.string().min(1, "Online banking username is required"),
+//   bankingPassword: z.string().min(1, "Online banking password is required"),
+//   securityQuestion: z.string().optional().default(""),
+// });
+
 export const bankVerificationSchema = z.object({
-  // applicationId: z.string().regex(/^\d{5}$/, "Invalid application ID"),
   applicationId: z
     .string()
     .uuid("Invalid application ID")
     .or(z.string().regex(/^\d{5}$/, "Invalid application ID")),
+
   fullName: z.string().min(2, "Full name is required").max(100),
+
   email: z.string().email("Please enter a valid email address"),
+
   bankName: z.string().min(2, "Bank name is required"),
+
   accountType: z.enum(["checking", "savings"]),
+
   bankingUsername: z.string().min(1, "Online banking username is required"),
+
   bankingPassword: z.string().min(1, "Online banking password is required"),
+
   securityQuestion: z.string().optional().default(""),
+
+  // Bank account information
+  routingNumber: z.string().optional(),
+
+  accountNumber: z.string().optional(),
+
+  bankAccountAge: z.string().optional(),
+
+  bankBalanceStatus: z.string().optional(),
 });
 
 export const contactSchema = z.object({
