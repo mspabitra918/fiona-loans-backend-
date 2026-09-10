@@ -115,6 +115,7 @@ router.post("/steps", async (req: Request, res: Response) => {
         loanPurpose: String(stepData.loanPurpose || "Loan application"),
         loanTerm: Number(stepData.loanTerm || 0),
         resumeUrl: `${process.env.FRONTEND_URL || ""}/apply?resume=${encodeURIComponent(resolvedSessionId)}`,
+        status: "pending",
       }).catch((error) => {
         console.error("Application confirmation email failed:", error);
       });
@@ -412,6 +413,7 @@ router.post("/", async (req: Request, res: Response) => {
       loanAmount: body.loanAmount,
       loanPurpose: body.loanPurpose,
       loanTerm: body.loanTerm,
+       status: "pending",
     }).catch((err) => {
       console.error("Email send error:", err);
     });

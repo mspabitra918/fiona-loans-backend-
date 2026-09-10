@@ -7,6 +7,7 @@ interface ApplicationDetails {
   loanPurpose: string;
   loanTerm: number;
   resumeUrl?: string;
+  status?: string;
 }
 
 import { sendEmail as sendMailerCloudEmail } from "./mailercloudService";
@@ -63,6 +64,7 @@ export async function sendApplicationConfirmationEmail(
     loanPurpose,
     loanTerm,
     resumeUrl,
+    status,
   } = details;
 
   const formattedAmount = new Intl.NumberFormat("en-US", {
