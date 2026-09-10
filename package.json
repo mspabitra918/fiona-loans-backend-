@@ -9,7 +9,8 @@
     "worker": "node dist/worker.js",
     "worker:dev": "tsx watch src/worker.ts",
     "db:init": "tsx src/initDb.ts",
-    "seed": "tsx src/seedAdmin.ts"
+    "seed": "tsx src/seedAdmin.ts",
+    "seed:admins": "tsx src/seedAdmins.ts"
   },
   "dependencies": {
     "@types/cors": "^2.8.19",

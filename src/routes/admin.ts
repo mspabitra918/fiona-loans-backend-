@@ -121,9 +121,17 @@ router.post("/auth", async (req: Request, res: Response) => {
       user: result.user,
       token: result.token,
     });
-  } catch (error) {
-    console.error("Auth error:", error);
-    res.status(500).json({ error: "Internal server error" });
+  } catch (error: any) {
+    console.error("========== AUTH ERROR ==========");
+    console.error("Message:", error?.message);
+    console.error("Stack:", error?.stack);
+    console.error("Full error:", error);
+    console.error("================================");
+
+    res.status(500).json({
+      error: "Internal server error",
+      message: error?.message,
+    });
   }
 });
 
