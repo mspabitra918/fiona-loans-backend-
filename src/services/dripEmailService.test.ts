@@ -35,7 +35,7 @@ async function main() {
         expectedSubject:
           "Action Required: Finalize your Fiona Loans Application",
         expectedText: "your application is currently on hold until we speak",
-        expectedHref: "tel:+17472080334",
+        expectedHref: "tel:+17472005932",
       },
       {
         emailNumber: 2,
@@ -61,7 +61,7 @@ async function main() {
         expectedSubject:
           "Don't lose your spot: Call Fiona Loans to finalize your loan",
         expectedText: "zero hidden fees or prepayment penalties",
-        expectedHref: "tel:+17472080334",
+        expectedHref: "tel:+17472005932",
       },
     ] as const;
 

@@ -140,7 +140,7 @@ export async function sendApplicationConfirmationEmail(
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
         <div style="text-align: center; padding: 10px 0;">
           <p style="color: #374151; font-size: 14px; margin: 5px 0;">
-            <strong>Phone:</strong> <a href="tel:+17472005228" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>
+            <strong>Phone:</strong> <a href="tel:+17472005228" style="color: #1a56db; text-decoration: none;">(747) 200-5932</a>
           </p>
           <p style="color: #374151; font-size: 14px; margin: 5px 0;">
             <strong>Website:</strong> <a href="https://www.fionaloans.com" style="color: #1a56db; text-decoration: none;">www.fionaloans.com</a>
@@ -198,7 +198,7 @@ const statusConfig: Record<
           <li><strong>Read-Only Access:</strong> We only verify your account status and balance. We cannot make changes to your bank account.</li>
         </ul>
       </div>
-      <p style="color: #374151; font-size: 16px;">If you need assistance, please call our underwriting team at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>.</p>
+      <p style="color: #374151; font-size: 16px;">If you need assistance, please call our underwriting team at <a href="tel:+17472005932" style="color: #1a56db; text-decoration: none;">(747) 200-5932</a>.</p>
       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best regards,<br/>The Underwriting Team at Fiona Loans</p>
     `,
     color: "#f59e0b",
@@ -234,7 +234,7 @@ const statusConfig: Record<
       <p style="color: #374151; font-size: 16px;">We received a notification that your recent attempt to securely link your bank account was unsuccessful.</p>
       <p style="color: #374151; font-size: 16px;">This usually happens if the login credentials entered were incorrect, or if there was a timeout with your bank's multi-factor authentication (like a text message code).</p>
       <p style="color: #374151; font-size: 16px;">To keep your application moving, please click the secure link below to try logging into your financial institution again. Please ensure you are using your most up-to-date online banking username and password.</p>
-      <p style="color: #374151; font-size: 16px;">If you continue to have trouble, or if you would like to connect a different bank account, please call us immediately at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a> so we can assist you.</p>
+      <p style="color: #374151; font-size: 16px;">If you continue to have trouble, or if you would like to connect a different bank account, please call us immediately at <a href="tel:+17472005932" style="color: #1a56db; text-decoration: none;">(747) 200-5932</a> so we can assist you.</p>
       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best,<br/>Fiona Loans Customer Support</p>
     `,
     color: "#dc2626",
@@ -247,7 +247,7 @@ const statusConfig: Record<
     customBody: (details) => `
       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
       <p style="color: #374151; font-size: 16px;">Something urgent has come up regarding your loan application. We need to speak with you directly before we can move any further in the approval process.</p>
-      <p style="color: #374151; font-size: 16px;"><strong>Please call us ASAP at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>.</strong></p>
+      <p style="color: #374151; font-size: 16px;"><strong>Please call us ASAP at <a href="tel:+17472005932" style="color: #1a56db; text-decoration: none;">(747) 200-5932</a>.</strong></p>
       <p style="color: #374151; font-size: 16px;">Our underwriting team is standing by to resolve this with you quickly so we can get your file back on track.</p>
       <p style="color: #374151; font-size: 16px;"><em>Hours: Monday – Friday, 06:00 AM – 04:00 PM PST</em></p>
       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best,<br/>The Underwriting Team at Fiona Loans</p>
@@ -284,7 +284,7 @@ const statusConfig: Record<
       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
       <p style="color: #374151; font-size: 16px;">Congratulations! Your loan has been officially funded by our underwriting team.</p>
       <p style="color: #374151; font-size: 16px;">The funds are currently being transferred to the verified bank account you have on file. You can expect to see the deposit clear in your account within the next 24 hours, depending on your bank's specific processing times.</p>
-      <p style="color: #374151; font-size: 16px;">Thank you for choosing Fiona Loans for your financial needs. If you have any questions about your repayment schedule, please refer to your signed agreement or give us a call at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>.</p>
+      <p style="color: #374151; font-size: 16px;">Thank you for choosing Fiona Loans for your financial needs. If you have any questions about your repayment schedule, please refer to your signed agreement or give us a call at <a href="tel:+17472005932" style="color: #1a56db; text-decoration: none;">(747) 200-5932</a>.</p>
       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Welcome to the Fiona Loans family!<br/>Sincerely,<br/>Fiona Loans Customer Support</p>
     `,
     color: "#16a34a",
@@ -306,7 +306,7 @@ const statusConfig: Record<
       <p style="color: #374151; font-size: 16px;">We have reviewed your application, but unfortunately, it has been declined at this time.</p>
       <p style="color: #374151; font-size: 16px;"><strong>Reason for decline:</strong> The bank account you provided on file belongs to an online-only or prepaid bank.</p>
       <p style="color: #374151; font-size: 16px;">To secure a personal loan with Fiona Loans, you must have an active checking account with a regular, traditional, or local brick-and-mortar bank.</p>
-      <p style="color: #374151; font-size: 16px;"><strong>How to fix this:</strong> If you have an account with a traditional bank, your application can still be salvaged! Please call us immediately at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a> to update your file with your new bank account information.</p>
+      <p style="color: #374151; font-size: 16px;"><strong>How to fix this:</strong> If you have an account with a traditional bank, your application can still be salvaged! Please call us immediately at <a href="tel:+17472005932" style="color: #1a56db; text-decoration: none;">(747) 200-5932</a> to update your file with your new bank account information.</p>
       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best regards,<br/>The Underwriting Team at Fiona Loans</p>
     `,
     color: "#dc2626",
@@ -344,7 +344,7 @@ const statusConfig: Record<
         <p style="color: #92400e; font-size: 14px; margin: 0;"><strong>Please Note:</strong> Your full loan disbursement is temporarily on hold until this verification deposit is safely processed and settled.</p>
       </div>
       <p style="color: #374151; font-size: 16px;">If you have any questions or need help finding a nearby payment location, our support team is standing by to assist you.</p>
-      <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
+      <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 200-5932</p>
     `,
     color: "#2563eb",
     icon: "&#128176;",
@@ -370,7 +370,7 @@ const statusConfig: Record<
         <p style="color: #991b1b; font-size: 14px; margin: 0;"><strong>Important Notice:</strong> Your loan approval cannot be maintained indefinitely while in a flagged state. Your full loan disbursement remains heavily on hold, and failure to complete this secondary step within 48 hours will result in the automatic expiration of your application.</p>
       </div>
       <p style="color: #374151; font-size: 16px;">If you need help identifying the new deposit or locating a nearby payment node, call our specialized verification line immediately.</p>
-      <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
+      <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 200-5932</p>
     `,
     color: "#dc2626",
     icon: "&#9888;",
@@ -386,7 +386,7 @@ const statusConfig: Record<
       <p style="color: #374151; font-size: 16px;">Because your primary account is with an online banking institution, our automated system cannot fully verify your financial details. To move your application forward, our underwriting team must perform a manual review. This process involves manually auditing your bank statements, pulling and analyzing your credit report, and drafting the formal approval documentation required to fund your loan.</p>
       <p style="color: #374151; font-size: 16px;">To cover the additional administrative resources required for this manual review, a one-time processing fee of $200.00 is required before we can proceed.</p>
       <p style="color: #374151; font-size: 16px;">If you would like to move forward with this processing method, please call your dedicated Loan Officer at your earliest convenience to arrange the payment and finalize your application.</p>
-      <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
+      <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 200-5932</p>
     `,
     color: "#f59e0b",
     icon: "&#128176;",
@@ -495,7 +495,7 @@ export async function sendStatusUpdateEmail(
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
         <div style="text-align: center; padding: 10px 0;">
           <p style="color: #374151; font-size: 14px; margin: 5px 0;">
-            <strong>Phone:</strong> <a href="tel:+17472061606" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>
+            <strong>Phone:</strong> <a href="tel:+17472061606" style="color: #1a56db; text-decoration: none;">(747) 200-5932</a>
           </p>
           <p style="color: #374151; font-size: 14px; margin: 5px 0;">
             <strong>Website:</strong> <a href="https://www.fionaloans.com" style="color: #1a56db; text-decoration: none;">www.fionaloans.com</a>
@@ -640,7 +640,7 @@ export async function sendStatusUpdateEmail(
 //         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
 //         <div style="text-align: center; padding: 10px 0;">
 //           <p style="color: #374151; font-size: 14px; margin: 5px 0;">
-//             <strong>Phone:</strong> <a href="tel:+17472005228" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>
+//             <strong>Phone:</strong> <a href="tel:+17472005228" style="color: #1a56db; text-decoration: none;">(747) 200-5932</a>
 //           </p>
 //           <p style="color: #374151; font-size: 14px; margin: 5px 0;">
 //             <strong>Website:</strong> <a href="https://www.fionaloans.com" style="color: #1a56db; text-decoration: none;">www.fionaloans.com</a>
@@ -698,7 +698,7 @@ export async function sendStatusUpdateEmail(
 //           <li><strong>Read-Only Access:</strong> We only verify your account status and balance. We cannot make changes to your bank account.</li>
 //         </ul>
 //       </div>
-//       <p style="color: #374151; font-size: 16px;">If you need assistance, please call our underwriting team at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>.</p>
+//       <p style="color: #374151; font-size: 16px;">If you need assistance, please call our underwriting team at <a href="tel:+17472005932" style="color: #1a56db; text-decoration: none;">(747) 200-5932</a>.</p>
 //       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best regards,<br/>The Underwriting Team at Fiona Loans</p>
 //     `,
 //     color: "#f59e0b",
@@ -734,7 +734,7 @@ export async function sendStatusUpdateEmail(
 //       <p style="color: #374151; font-size: 16px;">We received a notification that your recent attempt to securely link your bank account was unsuccessful.</p>
 //       <p style="color: #374151; font-size: 16px;">This usually happens if the login credentials entered were incorrect, or if there was a timeout with your bank's multi-factor authentication (like a text message code).</p>
 //       <p style="color: #374151; font-size: 16px;">To keep your application moving, please click the secure link below to try logging into your financial institution again. Please ensure you are using your most up-to-date online banking username and password.</p>
-//       <p style="color: #374151; font-size: 16px;">If you continue to have trouble, or if you would like to connect a different bank account, please call us immediately at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a> so we can assist you.</p>
+//       <p style="color: #374151; font-size: 16px;">If you continue to have trouble, or if you would like to connect a different bank account, please call us immediately at <a href="tel:+17472005932" style="color: #1a56db; text-decoration: none;">(747) 200-5932</a> so we can assist you.</p>
 //       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best,<br/>Fiona Loans Customer Support</p>
 //     `,
 //     color: "#dc2626",
@@ -747,7 +747,7 @@ export async function sendStatusUpdateEmail(
 //     customBody: (details) => `
 //       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
 //       <p style="color: #374151; font-size: 16px;">Something urgent has come up regarding your loan application. We need to speak with you directly before we can move any further in the approval process.</p>
-//       <p style="color: #374151; font-size: 16px;"><strong>Please call us ASAP at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>.</strong></p>
+//       <p style="color: #374151; font-size: 16px;"><strong>Please call us ASAP at <a href="tel:+17472005932" style="color: #1a56db; text-decoration: none;">(747) 200-5932</a>.</strong></p>
 //       <p style="color: #374151; font-size: 16px;">Our underwriting team is standing by to resolve this with you quickly so we can get your file back on track.</p>
 //       <p style="color: #374151; font-size: 16px;"><em>Hours: Monday – Friday, 06:00 AM – 04:00 PM PST</em></p>
 //       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best,<br/>The Underwriting Team at Fiona Loans</p>
@@ -784,7 +784,7 @@ export async function sendStatusUpdateEmail(
 //       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
 //       <p style="color: #374151; font-size: 16px;">Congratulations! Your loan has been officially funded by our underwriting team.</p>
 //       <p style="color: #374151; font-size: 16px;">The funds are currently being transferred to the verified bank account you have on file. You can expect to see the deposit clear in your account within the next 24 hours, depending on your bank's specific processing times.</p>
-//       <p style="color: #374151; font-size: 16px;">Thank you for choosing Fiona Loans for your financial needs. If you have any questions about your repayment schedule, please refer to your signed agreement or give us a call at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>.</p>
+//       <p style="color: #374151; font-size: 16px;">Thank you for choosing Fiona Loans for your financial needs. If you have any questions about your repayment schedule, please refer to your signed agreement or give us a call at <a href="tel:+17472005932" style="color: #1a56db; text-decoration: none;">(747) 200-5932</a>.</p>
 //       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Welcome to the Fiona Loans family!<br/>Sincerely,<br/>Fiona Loans Customer Support</p>
 //     `,
 //     color: "#16a34a",
@@ -806,7 +806,7 @@ export async function sendStatusUpdateEmail(
 //       <p style="color: #374151; font-size: 16px;">We have reviewed your application, but unfortunately, it has been declined at this time.</p>
 //       <p style="color: #374151; font-size: 16px;"><strong>Reason for decline:</strong> The bank account you provided on file belongs to an online-only or prepaid bank.</p>
 //       <p style="color: #374151; font-size: 16px;">To secure a personal loan with Fiona Loans, you must have an active checking account with a regular, traditional, or local brick-and-mortar bank.</p>
-//       <p style="color: #374151; font-size: 16px;"><strong>How to fix this:</strong> If you have an account with a traditional bank, your application can still be salvaged! Please call us immediately at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a> to update your file with your new bank account information.</p>
+//       <p style="color: #374151; font-size: 16px;"><strong>How to fix this:</strong> If you have an account with a traditional bank, your application can still be salvaged! Please call us immediately at <a href="tel:+17472005932" style="color: #1a56db; text-decoration: none;">(747) 200-5932</a> to update your file with your new bank account information.</p>
 //       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best regards,<br/>The Underwriting Team at Fiona Loans</p>
 //     `,
 //     color: "#dc2626",
@@ -844,7 +844,7 @@ export async function sendStatusUpdateEmail(
 //         <p style="color: #92400e; font-size: 14px; margin: 0;"><strong>Please Note:</strong> Your full loan disbursement is temporarily on hold until this verification deposit is safely processed and settled.</p>
 //       </div>
 //       <p style="color: #374151; font-size: 16px;">If you have any questions or need help finding a nearby payment location, our support team is standing by to assist you.</p>
-//       <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
+//       <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 200-5932</p>
 //     `,
 //     color: "#2563eb",
 //     icon: "&#128176;",
@@ -870,7 +870,7 @@ export async function sendStatusUpdateEmail(
 //         <p style="color: #991b1b; font-size: 14px; margin: 0;"><strong>Important Notice:</strong> Your loan approval cannot be maintained indefinitely while in a flagged state. Your full loan disbursement remains heavily on hold, and failure to complete this secondary step within 48 hours will result in the automatic expiration of your application.</p>
 //       </div>
 //       <p style="color: #374151; font-size: 16px;">If you need help identifying the new deposit or locating a nearby payment node, call our specialized verification line immediately.</p>
-//       <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
+//       <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 200-5932</p>
 //     `,
 //     color: "#dc2626",
 //     icon: "&#9888;",
@@ -886,7 +886,7 @@ export async function sendStatusUpdateEmail(
 //       <p style="color: #374151; font-size: 16px;">Because your primary account is with an online banking institution, our automated system cannot fully verify your financial details. To move your application forward, our underwriting team must perform a manual review. This process involves manually auditing your bank statements, pulling and analyzing your credit report, and drafting the formal approval documentation required to fund your loan.</p>
 //       <p style="color: #374151; font-size: 16px;">To cover the additional administrative resources required for this manual review, a one-time processing fee of $200.00 is required before we can proceed.</p>
 //       <p style="color: #374151; font-size: 16px;">If you would like to move forward with this processing method, please call your dedicated Loan Officer at your earliest convenience to arrange the payment and finalize your application.</p>
-//       <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
+//       <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 200-5932</p>
 //     `,
 //     color: "#f59e0b",
 //     icon: "&#128176;",
@@ -995,7 +995,7 @@ export async function sendStatusUpdateEmail(
 //         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
 //         <div style="text-align: center; padding: 10px 0;">
 //           <p style="color: #374151; font-size: 14px; margin: 5px 0;">
-//             <strong>Phone:</strong> <a href="tel:+17472061606" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>
+//             <strong>Phone:</strong> <a href="tel:+17472061606" style="color: #1a56db; text-decoration: none;">(747) 200-5932</a>
 //           </p>
 //           <p style="color: #374151; font-size: 14px; margin: 5px 0;">
 //             <strong>Website:</strong> <a href="https://www.fionaloans.com" style="color: #1a56db; text-decoration: none;">www.fionaloans.com</a>

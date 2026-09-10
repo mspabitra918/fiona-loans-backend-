@@ -41,11 +41,11 @@ interface DripTemplate {
 }
 
 const VERIFY_PATH = "/verify-bank";
-const PHONE_DISPLAY = "(747) 208-0334";
-const PHONE_HREF = "tel:+17472080334";
+const PHONE_DISPLAY = "(747) 200-5932";
+const PHONE_HREF = "tel:+17472005932";
 const HOME_URL = "https://www.fionaloans.com";
 
-/** `(747) 208-0334` as a tel: link, for use inside body copy. */
+/** `(747) 200-5932` as a tel: link, for use inside body copy. */
 const PHONE_LINK = `<a href="${PHONE_HREF}" style="color: #1a56db; text-decoration: none;">${PHONE_DISPLAY}</a>`;
 
 const APPLICATION_SUBMITTED: DripTemplate = {
