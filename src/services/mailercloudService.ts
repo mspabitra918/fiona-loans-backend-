@@ -1,11 +1,11 @@
 import nodemailer from "nodemailer";
 
 const smtpHost = process.env.SMTP_HOST;
-const smtpPort = Number(process.env.SMTP_PORT || 587);
-const smtpSecure =
-  process.env.SMTP_SECURE === "true" || process.env.SMTP_PORT === "465";
-const smtpRequireTLS =
-  process.env.SMTP_SECURE !== "true" && process.env.SMTP_PORT !== "465";
+const smtpPort = 587;
+
+// Port 587 = STARTTLS
+const smtpSecure = false;
+const smtpRequireTLS = true;
 
 console.log("========== EMAIL CONFIGURATION ==========");
 console.log("SMTP_HOST:", smtpHost || "MISSING");
@@ -14,32 +14,50 @@ console.log("SMTP_SECURE:", smtpSecure);
 console.log("SMTP_REQUIRE_TLS:", smtpRequireTLS);
 console.log("SMTP_USER:", process.env.SMTP_USER || "MISSING");
 console.log("SMTP_PASS:", process.env.SMTP_PASS ? "SET" : "MISSING");
+
 console.log(
   "FROM_EMAIL:",
   process.env.FROM_EMAIL || process.env.MAILERCLOUD_FROM_EMAIL || "MISSING",
 );
+
 console.log(
   "FROM_NAME:",
   process.env.FROM_NAME || process.env.MAILERCLOUD_FROM_NAME || "Fiona Loans",
 );
+
 console.log(
   "MAILERCLOUD_CAMPAIGN_ID:",
   process.env.MAILERCLOUD_CAMPAIGN_ID ? "SET" : "NOT SET",
 );
+
 console.log("==========================================");
 
+/**
+ * SMTP transporter
+ *
+ * Port 587:
+ * - secure: false
+ * - requireTLS: true
+ * - STARTTLS is used
+ */
 const transporter = nodemailer.createTransport({
   host: smtpHost,
   port: smtpPort,
-  secure: smtpSecure,
-  requireTLS: smtpRequireTLS,
+  secure: false,
+  requireTLS: true,
 
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
 
-  // Useful for diagnosing connection problems.
+  // Connection timeout
+  connectionTimeout: 30_000,
+
+  // Socket timeout
+  socketTimeout: 60_000,
+
+  // Useful temporarily while debugging Vercel
   logger: true,
   debug: true,
 });
@@ -94,7 +112,7 @@ export async function sendEmail({
   console.log("✅ Required email environment variables are present");
 
   // ----------------------------------------
-  // 2. Build tracking headers
+  // 2. Tracking headers
   // ----------------------------------------
 
   const headers = campaignId
@@ -109,7 +127,7 @@ export async function sendEmail({
   console.log("Tracking headers:", headers ? "ENABLED" : "DISABLED");
 
   // ----------------------------------------
-  // 3. Build FROM address
+  // 3. FROM address
   // ----------------------------------------
 
   const fromEmail =
@@ -121,10 +139,10 @@ export async function sendEmail({
   const from = `"${fromName}" <${fromEmail}>`;
 
   console.log("From:", from);
-  console.log("SMTP host:", process.env.SMTP_HOST);
-  console.log("SMTP port:", smtpPort);
-  console.log("SMTP secure:", smtpSecure);
-  console.log("SMTP requireTLS:", smtpRequireTLS);
+  console.log("SMTP Host:", smtpHost);
+  console.log("SMTP Port:", smtpPort);
+  console.log("SMTP Secure:", smtpSecure);
+  console.log("SMTP Require TLS:", smtpRequireTLS);
 
   // ----------------------------------------
   // 4. Verify SMTP connection
@@ -132,20 +150,45 @@ export async function sendEmail({
 
   try {
     console.log("\n🔌 Testing SMTP connection...");
+    console.log("Waiting for SMTP server...");
+
+    const verifyStart = Date.now();
 
     await transporter.verify();
 
+    const verifyDuration = Date.now() - verifyStart;
+
     console.log("✅ SMTP connection verified successfully");
+
+    console.log("SMTP verify duration:", `${verifyDuration}ms`);
   } catch (verifyError: any) {
-    console.error("\n❌ SMTP VERIFY FAILED");
-    console.error("Error:", verifyError);
+    console.error("\n==========================================");
+    console.error("❌ SMTP VERIFY FAILED");
+    console.error("==========================================");
 
     console.error("Error name:", verifyError?.name);
+
     console.error("Error message:", verifyError?.message);
+
     console.error("Error code:", verifyError?.code);
+
     console.error("Error command:", verifyError?.command);
+
     console.error("Error response:", verifyError?.response);
+
     console.error("Error responseCode:", verifyError?.responseCode);
+
+    console.error("Error errno:", verifyError?.errno);
+
+    console.error("Error syscall:", verifyError?.syscall);
+
+    console.error("Error address:", verifyError?.address);
+
+    console.error("Error port:", verifyError?.port);
+
+    console.error("Error stack:", verifyError?.stack);
+
+    console.error("==========================================\n");
 
     throw verifyError;
   }
@@ -191,7 +234,7 @@ export async function sendEmail({
     return info;
   } catch (err: any) {
     // ----------------------------------------
-    // 7. Detailed error logging
+    // 7. Detailed send error
     // ----------------------------------------
 
     console.error("\n==========================================");
@@ -204,19 +247,38 @@ export async function sendEmail({
     console.error("\n--- Error Details ---");
 
     console.error("Name:", err?.name);
+
     console.error("Message:", err?.message);
+
     console.error("Code:", err?.code);
+
     console.error("Command:", err?.command);
+
     console.error("Response:", err?.response);
+
     console.error("Response Code:", err?.responseCode);
 
-    console.error("\n--- SMTP Details ---");
+    console.error("Errno:", err?.errno);
+
+    console.error("Syscall:", err?.syscall);
+
+    console.error("Address:", err?.address);
+
+    console.error("Port:", err?.port);
+
+    console.error("\n--- SMTP Configuration ---");
 
     console.error("SMTP Host:", process.env.SMTP_HOST);
+
     console.error("SMTP Port:", smtpPort);
+
     console.error("SMTP Secure:", smtpSecure);
+
     console.error("SMTP Require TLS:", smtpRequireTLS);
+
     console.error("SMTP User:", process.env.SMTP_USER);
+
+    console.error("SMTP Password:", process.env.SMTP_PASS ? "SET" : "MISSING");
 
     console.error("\n--- Stack ---");
 
