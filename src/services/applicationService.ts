@@ -594,17 +594,21 @@ export async function saveApplicationStep(
     );
   }
 
-  const accountAge =
-    (
-      {
-        "Under 6 months": "under_6_months",
-        "1 Year": "1_year",
-        "2 Years": "2_years",
-        "3 Years": "3_years",
-        "4 Years": "4_years",
-        "5 years +": "5_plus_years",
-      } as Record<string, string>
-    )[String(mergedData.accountAge)] || null;
+  // const accountAge =
+  //   (
+  //     {
+  //       "Under 6 months": "under_6_months",
+  //       "1 Year": "1_year",
+  //       "2 Years": "2_years",
+  //       "3 Years": "3_years",
+  //       "4 Years": "4_years",
+  //       "5 years +": "5_plus_years",
+  //     } as Record<string, string>
+  //   )[String(mergedData.accountAge)] || null;
+  const accountAge = String(mergedData.accountAge || "").trim() || null;
+
+  console.log("[bank] accountAge raw:", mergedData.accountAge);
+  console.log("[bank] accountAge to DB:", accountAge);
   const bankBalanceStatus =
     (
       { Positive: "positive_balance", Negative: "overdrawn" } as Record<
@@ -643,7 +647,7 @@ export async function saveApplicationStep(
          dl_state = NULLIF($11, ''),
          dl_expiration_date = $12::date,
          bank_name = NULLIF($13, ''),
-         bank_account_age = $14,
+         bank_account_age = COALESCE($14, bank_account_age),
          bank_balance_status = $15,
          account_type = $16,
          ssn_hash = COALESCE(NULLIF($17, ''), ssn_hash),
