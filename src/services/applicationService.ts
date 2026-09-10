@@ -279,6 +279,10 @@ export async function saveApplicationStep(
   status: string;
   derivedData: DerivedApplicationFields;
 }> {
+  // ============================================================
+  // 1. FIND EXISTING APPLICATION
+  // ============================================================
+
   const existing = await queryOne<{
     id: string;
     application_id: string;
@@ -287,13 +291,24 @@ export async function saveApplicationStep(
     session_id: string;
     status: string;
   }>(
-    `SELECT id, application_id, application_data, step_number, session_id, status
+    `SELECT
+       id,
+       application_id,
+       application_data,
+       step_number,
+       session_id,
+       status
      FROM loan_applications
-    WHERE session_id = $1 OR id::text = $1
+     WHERE session_id = $1
+        OR id::text = $1
      ORDER BY created_at DESC
      LIMIT 1`,
     [input.sessionId],
   );
+
+  // ============================================================
+  // 2. MERGE APPLICATION DATA
+  // ============================================================
 
   const mergedData = {
     ...(existing?.application_data ?? {}),
@@ -301,14 +316,24 @@ export async function saveApplicationStep(
   } as Record<string, unknown>;
 
   const id = existing?.id ?? randomUUID();
+
   const applicationId =
     existing?.application_id ??
     (await generateUniqueId("loan_applications", "application_id"));
+
+  // ============================================================
+  // 3. STEP MAP
+  // ============================================================
+
   const stepMap = {
     1: "step1",
     2: "step2",
     3: "step3",
   } as const;
+
+  // ============================================================
+  // 4. RESOLVE STATUS
+  // ============================================================
 
   const resolvedStatus =
     input.step === 1
@@ -323,6 +348,10 @@ export async function saveApplicationStep(
           ? "bank_verification_pending"
           : "bank_verification_completed";
 
+  // ============================================================
+  // 5. REMOVE SENSITIVE VALUES FROM application_data
+  // ============================================================
+
   const {
     ssn,
     confirmSsn,
@@ -332,7 +361,17 @@ export async function saveApplicationStep(
     routingNumber,
     ...safeMergedData
   } = mergedData;
+
+  // ============================================================
+  // 6. DERIVED DATA
+  // ============================================================
+
   const derivedData = calculateDerivedApplicationFields(mergedData);
+
+  // ============================================================
+  // 7. APPLICATION JSON DATA
+  // ============================================================
+
   const applicationData = {
     ...safeMergedData,
     derivedData,
@@ -351,85 +390,215 @@ export async function saveApplicationStep(
       input.step === 3 ? new Date().toISOString() : mergedData.step3SubmittedAt,
   };
 
+  // ============================================================
+  // 8. BASE VALUES
+  // ============================================================
+
   const baseValues = {
     first_name: String(mergedData.firstName || "").trim(),
+
     last_name: String(mergedData.lastName || "").trim(),
+
     email: String(mergedData.email || "").trim(),
+
     phone: String(mergedData.mobilePhone || mergedData.phone || "").trim(),
+
     date_of_birth: mergedData.dob
       ? new Date(String(mergedData.dob)).toISOString().slice(0, 10)
       : null,
+
     street_address: String(mergedData.streetAddress || "").trim(),
+
     city: String(mergedData.city || "").trim(),
+
     state: String(mergedData.state || "").trim(),
+
     zip_code: String(mergedData.zipCode || "").trim(),
+
     loan_amount: Number(mergedData.loanAmount ?? 0),
+
     loan_purpose: String(mergedData.loanPurpose || "").trim(),
+
+    // IMPORTANT
+    loan_purpose_other_detail: String(
+      mergedData.loanPurposeOtherDetail ||
+        mergedData.loan_purpose_other_detail ||
+        "",
+    ).trim(),
+
     loan_term: Number(mergedData.loanTerm ?? 0) || null,
+
     time_at_current_address: String(
       mergedData.timeAtAddress || "under_6_months",
     )
-      .toLowerCase()
-      .replace(/[+– ]/g, "_")
-      .replace("years", "years")
-      .replace("months", "months"),
+      .trim()
+      .toLowerCase(),
+
     housing_status:
       (
         {
           Rent: "rent",
+
           "Own with mortgage": "own_with_mortgage",
+
           "Own outright": "own_outright",
+
           "Living with family or friends": "living_with_family_friends",
+
           "Military housing": "military_housing",
+
           Other: "other",
         } as Record<string, string>
       )[String(mergedData.housingStatus)] || "other",
+
     employment_status:
       (
         {
           "Employed — Full Time": "employed_full_time",
+
           "Employed — Part Time": "employed_part_time",
+
           "Self-Employed": "self_employed",
+
           "Active Military": "active_military",
+
           Retired: "retired",
+
           Disability: "disability",
+
           "Social Security": "social_security",
+
           "Unemployment Benefits": "unemployment_benefits",
+
           "Other Benefits": "other_benefits",
+
           Student: "student",
+
           "Not Currently Employed": "not_currently_employed",
+
           Other: "other_benefits",
         } as Record<string, string>
       )[String(mergedData.employmentStatus)] || "not_currently_employed",
+
     primary_income_type: String(mergedData.primaryIncomeType || "other")
       .toLowerCase()
       .replace(/[— -]+/g, "_"),
+
     net_monthly_income: Number(mergedData.netMonthlyIncome || 0),
+
     pay_frequency: String(mergedData.payFrequency || "irregular")
       .toLowerCase()
       .replace(/[— -]+/g, "_"),
+
     direct_deposit: [true, "Yes", "yes"].includes(
       mergedData.directDeposit as never,
     ),
+
     additional_monthly_income: Number(mergedData.additionalMonthlyIncome || 0),
+
     additional_income_source: String(mergedData.additionalIncomeSource || ""),
-    status: "pending",
+
     ip_address: input.ipAddress,
+
     user_agent: input.userAgent,
   };
+
+  // ============================================================
+  // 9. ENCRYPT SENSITIVE VALUES
+  // ============================================================
+
   const encryptedSsn = ssn ? encrypt(String(ssn)) : null;
+
   const encryptedDlNumber = dlNumber ? encrypt(String(dlNumber)) : null;
+
   const encryptedAccountNumber = accountNumber
     ? encrypt(String(accountNumber))
     : null;
+
   const encryptedRoutingNumber = routingNumber
     ? encrypt(String(routingNumber))
     : null;
+
   const ssnHash = ssn ? hashSSN(String(ssn).replace(/\D/g, "")) : null;
+
+  // ============================================================
+  // 10. PLAID DETAILS
+  // ============================================================
+
   const plaidDetails = (mergedData.plaidDetails || {}) as Record<
     string,
     unknown
   >;
+
+  // ============================================================
+  // 11. ACCOUNT AGE
+  // Frontend sends values such as:
+  // under_6_months
+  // 1_year
+  // 2_years
+  // 3_years
+  // 4_years
+  // 5_plus_years
+  // ============================================================
+
+  const accountAge = String(mergedData.accountAge || "").trim() || null;
+
+  console.log("[bank] accountAge raw:", mergedData.accountAge);
+
+  console.log("[bank] accountAge DB:", accountAge);
+
+  // ============================================================
+  // 12. BANK BALANCE STATUS
+  // ============================================================
+
+  const bankBalanceStatus =
+    (
+      {
+        Positive: "positive_balance",
+        Negative: "overdrawn",
+      } as Record<string, string>
+    )[String(mergedData.accountStatus)] || null;
+
+  // ============================================================
+  // 13. ACCOUNT TYPE
+  // ============================================================
+
+  const accountType =
+    String(mergedData.accountType || "").toLowerCase() || null;
+
+  // ============================================================
+  // 14. TIME AT CURRENT JOB
+  // Frontend should send the DB value directly.
+  //
+  // Example:
+  // under_6_months
+  // 3_5_months
+  // 6_11_months
+  // 1_2_years
+  // 3_5_years
+  // 5_plus_years
+  // ============================================================
+
+  const timeAtCurrentJob =
+    String(
+      mergedData.timeAtJob || mergedData.time_at_current_job || "",
+    ).trim() || null;
+
+  console.log("[employment] timeAtJob raw:", mergedData.timeAtJob);
+
+  console.log("[employment] timeAtCurrentJob DB:", timeAtCurrentJob);
+
+  // ============================================================
+  // 15. NEXT PAY DATE
+  // ============================================================
+
+  const nextPayDate = mergedData.nextPayDate
+    ? new Date(String(mergedData.nextPayDate)).toISOString().slice(0, 10)
+    : null;
+
+  // ============================================================
+  // 16. UPDATE EXISTING APPLICATION
+  // ============================================================
 
   if (existing) {
     await query(
@@ -440,229 +609,618 @@ export async function saveApplicationStep(
          application_data = $3::jsonb,
          step_number = $4,
          current_step = $5,
-         step1_started_at = COALESCE(step1_started_at, NOW()),
-         step1_submitted_at = CASE WHEN $4 = 1 THEN NOW() ELSE step1_submitted_at END,
-         step2_submitted_at = CASE WHEN $4 = 2 THEN NOW() ELSE step2_submitted_at END,
-         step3_submitted_at = CASE WHEN $4 = 3 THEN NOW() ELSE step3_submitted_at END,
-         total_time_on_form = COALESCE(total_time_on_form, 0),
+
+         step1_started_at =
+           COALESCE(
+             step1_started_at,
+             NOW()
+           ),
+
+         step1_submitted_at =
+           CASE
+             WHEN $4 = 1
+             THEN NOW()
+             ELSE step1_submitted_at
+           END,
+
+         step2_submitted_at =
+           CASE
+             WHEN $4 = 2
+             THEN NOW()
+             ELSE step2_submitted_at
+           END,
+
+         step3_submitted_at =
+           CASE
+             WHEN $4 = 3
+             THEN NOW()
+             ELSE step3_submitted_at
+           END,
+
+         total_time_on_form =
+           COALESCE(
+             total_time_on_form,
+             0
+           ),
+
          status = CASE
-           WHEN $22 = 'draft' THEN 'draft'
-           WHEN $22 = 'prequalified' THEN 'prequalified'
-           WHEN $22 = 'declined' THEN 'declined'
-           WHEN $22 = 'identity_verified' THEN 'identity_verified'
-           WHEN $22 = 'bank_verification_pending' THEN 'bank_verification_pending'
-           WHEN $22 = 'bank_verification_completed' THEN 'bank_verification_completed'
+           WHEN $22 = 'draft'
+             THEN 'draft'
+
+           WHEN $22 = 'prequalified'
+             THEN 'prequalified'
+
+           WHEN $22 = 'declined'
+             THEN 'declined'
+
+           WHEN $22 = 'identity_verified'
+             THEN 'identity_verified'
+
+           WHEN $22 = 'bank_verification_pending'
+             THEN 'bank_verification_pending'
+
+           WHEN $22 = 'bank_verification_completed'
+             THEN 'bank_verification_completed'
+
            ELSE status
          END,
-         page_url = COALESCE(NULLIF($6, ''), page_url),
-         referrer_url = COALESCE(NULLIF($7, ''), referrer_url),
-         first_name = COALESCE(NULLIF($8, ''), first_name),
-         last_name = COALESCE(NULLIF($9, ''), last_name),
-         email = COALESCE(NULLIF($10, ''), email),
-         phone = COALESCE(NULLIF($11, ''), phone),
-         date_of_birth = COALESCE($12::date, date_of_birth),
-         street_address = COALESCE(NULLIF($13, ''), street_address),
-         city = COALESCE(NULLIF($14, ''), city),
-         state = COALESCE(NULLIF($15, ''), state),
-         zip_code = COALESCE(NULLIF($16, ''), zip_code),
-         loan_amount = CASE WHEN $17::numeric > 0 THEN $17::numeric ELSE loan_amount END,
-         loan_purpose = COALESCE(NULLIF($18, ''), loan_purpose),
-         loan_term = CASE WHEN $19::integer > 0 THEN $19::integer ELSE loan_term END,
-         ip_address = COALESCE(NULLIF($20, ''), ip_address),
-         user_agent = COALESCE(NULLIF($21, ''), user_agent),
-         ssn_encrypted = COALESCE(NULLIF($24, ''), ssn_encrypted),
-         dl_number_encrypted = COALESCE(NULLIF($25, ''), dl_number_encrypted),
-         account_number_encrypted = COALESCE(NULLIF($26, ''), account_number_encrypted),
-         routing_number_encrypted = COALESCE(NULLIF($27, ''), routing_number_encrypted),
-         time_at_current_address = $28,
-         housing_status = $29,
-         employment_status = $30,
-         primary_income_type = $31,
-         net_monthly_income = $32,
-         pay_frequency = $33,
-         direct_deposit = $34,
-         additional_monthly_income = $35,
-         additional_income_source = NULLIF($36, ''),
+
+         page_url =
+           COALESCE(
+             NULLIF($6, ''),
+             page_url
+           ),
+
+         referrer_url =
+           COALESCE(
+             NULLIF($7, ''),
+             referrer_url
+           ),
+
+         first_name =
+           COALESCE(
+             NULLIF($8, ''),
+             first_name
+           ),
+
+         last_name =
+           COALESCE(
+             NULLIF($9, ''),
+             last_name
+           ),
+
+         email =
+           COALESCE(
+             NULLIF($10, ''),
+             email
+           ),
+
+         phone =
+           COALESCE(
+             NULLIF($11, ''),
+             phone
+           ),
+
+         date_of_birth =
+           COALESCE(
+             $12::date,
+             date_of_birth
+           ),
+
+         street_address =
+           COALESCE(
+             NULLIF($13, ''),
+             street_address
+           ),
+
+         city =
+           COALESCE(
+             NULLIF($14, ''),
+             city
+           ),
+
+         state =
+           COALESCE(
+             NULLIF($15, ''),
+             state
+           ),
+
+         zip_code =
+           COALESCE(
+             NULLIF($16, ''),
+             zip_code
+           ),
+
+         loan_amount =
+           CASE
+             WHEN $17::numeric > 0
+             THEN $17::numeric
+             ELSE loan_amount
+           END,
+
+         loan_purpose =
+           COALESCE(
+             NULLIF($18, ''),
+             loan_purpose
+           ),
+
+         loan_term =
+           CASE
+             WHEN $19::integer > 0
+             THEN $19::integer
+             ELSE loan_term
+           END,
+
+         ip_address =
+           COALESCE(
+             NULLIF($20, ''),
+             ip_address
+           ),
+
+         user_agent =
+           COALESCE(
+             NULLIF($21, ''),
+             user_agent
+           ),
+
+         ssn_encrypted =
+           COALESCE(
+             NULLIF($24, ''),
+             ssn_encrypted
+           ),
+
+         dl_number_encrypted =
+           COALESCE(
+             NULLIF($25, ''),
+             dl_number_encrypted
+           ),
+
+         account_number_encrypted =
+           COALESCE(
+             NULLIF($26, ''),
+             account_number_encrypted
+           ),
+
+         routing_number_encrypted =
+           COALESCE(
+             NULLIF($27, ''),
+             routing_number_encrypted
+           ),
+
+         time_at_current_address =
+           COALESCE(
+             NULLIF($28, ''),
+             time_at_current_address
+           ),
+
+         housing_status =
+           COALESCE(
+             NULLIF($29, ''),
+             housing_status
+           ),
+
+         employment_status =
+           COALESCE(
+             NULLIF($30, ''),
+             employment_status
+           ),
+
+         primary_income_type =
+           COALESCE(
+             NULLIF($31, ''),
+             primary_income_type
+           ),
+
+         net_monthly_income =
+           COALESCE(
+             $32,
+             net_monthly_income
+           ),
+
+         pay_frequency =
+           COALESCE(
+             NULLIF($33, ''),
+             pay_frequency
+           ),
+
+         direct_deposit =
+           COALESCE(
+             $34,
+             direct_deposit
+           ),
+
+         additional_monthly_income =
+           COALESCE(
+             $35,
+             additional_monthly_income
+           ),
+
+         additional_income_source =
+           COALESCE(
+             NULLIF($36, ''),
+             additional_income_source
+           ),
+
+         loan_purpose_other_detail =
+           COALESCE(
+             NULLIF($37, ''),
+             loan_purpose_other_detail
+           ),
+
+         time_at_current_job =
+           COALESCE(
+             NULLIF($38, ''),
+             time_at_current_job
+           ),
+
          updated_at = NOW()
-      WHERE id = $23`,
+
+       WHERE id = $23`,
       [
-        input.sessionId,
-        applicationId,
-        JSON.stringify(applicationData),
-        input.step,
-        stepMap[input.step as 1 | 2 | 3],
-        input.pageUrl || "",
-        input.referrerUrl || "",
-        baseValues.first_name,
-        baseValues.last_name,
-        baseValues.email,
-        baseValues.phone,
-        baseValues.date_of_birth,
-        baseValues.street_address,
-        baseValues.city,
-        baseValues.state,
-        baseValues.zip_code,
-        baseValues.loan_amount,
-        baseValues.loan_purpose,
-        baseValues.loan_term,
-        input.ipAddress,
-        input.userAgent,
-        resolvedStatus,
-        id,
-        encryptedSsn,
-        encryptedDlNumber,
-        encryptedAccountNumber,
-        encryptedRoutingNumber,
-        baseValues.time_at_current_address,
-        baseValues.housing_status,
-        baseValues.employment_status,
-        baseValues.primary_income_type,
-        baseValues.net_monthly_income,
-        baseValues.pay_frequency,
-        baseValues.direct_deposit,
-        baseValues.additional_monthly_income,
-        baseValues.additional_income_source,
-      ],
-    );
-  } else {
-    await query(
-      `INSERT INTO loan_applications (
-        id, application_id, session_id, application_data, step_number, current_step,
-        first_name, last_name, email, phone, date_of_birth,
-        street_address, city, state, zip_code,
-        loan_amount, loan_purpose, loan_term,
-        time_at_current_address, housing_status, employment_status, primary_income_type,
-        net_monthly_income, pay_frequency, direct_deposit,
-        additional_monthly_income, additional_income_source,
-        ssn_encrypted, dl_number_encrypted, account_number_encrypted, routing_number_encrypted,
-        ip_address, user_agent, page_url, referrer_url,
-        step1_started_at, step1_submitted_at, step2_submitted_at, step3_submitted_at,
-        total_time_on_form, status, created_at, updated_at
-      ) VALUES (
-        $1, $2, $3, $4::jsonb, $5, $6,
-        $7, $8, $9, $10, $11,
-        $12, $13, $14, $15,
-        $16, $17, $18,
-        $19, $20, $21, $22, $23, $24, $25, $26, $27,
-        $28, $29, $30, $31,
-        $32, $33, $34, $35,
-        $36, $37, $38, $39,
-        0, $40, NOW(), NOW()
-      )`,
-      [
-        id,
-        applicationId,
-        input.sessionId,
-        JSON.stringify(applicationData),
-        input.step,
-        stepMap[input.step as 1 | 2 | 3],
-        baseValues.first_name,
-        baseValues.last_name,
-        baseValues.email,
-        baseValues.phone,
-        baseValues.date_of_birth,
-        baseValues.street_address,
-        baseValues.city,
-        baseValues.state,
-        baseValues.zip_code,
-        baseValues.loan_amount,
-        baseValues.loan_purpose,
-        baseValues.loan_term,
-        baseValues.time_at_current_address,
-        baseValues.housing_status,
-        baseValues.employment_status,
-        baseValues.primary_income_type,
-        baseValues.net_monthly_income,
-        baseValues.pay_frequency,
-        baseValues.direct_deposit,
-        baseValues.additional_monthly_income,
-        baseValues.additional_income_source,
-        encryptedSsn,
-        encryptedDlNumber,
-        encryptedAccountNumber,
-        encryptedRoutingNumber,
-        input.ipAddress,
-        input.userAgent,
-        input.pageUrl || "",
-        input.referrerUrl || "",
-        applicationData.step1StartedAt || null,
-        input.step === 1 ? new Date().toISOString() : null,
-        input.step === 2 ? new Date().toISOString() : null,
-        input.step === 3 ? new Date().toISOString() : null,
-        resolvedStatus,
+        input.sessionId, // $1
+        applicationId, // $2
+        JSON.stringify(applicationData), // $3
+        input.step, // $4
+        stepMap[input.step as 1 | 2 | 3], // $5
+
+        input.pageUrl || "", // $6
+        input.referrerUrl || "", // $7
+
+        baseValues.first_name, // $8
+        baseValues.last_name, // $9
+        baseValues.email, // $10
+        baseValues.phone, // $11
+        baseValues.date_of_birth, // $12
+        baseValues.street_address, // $13
+        baseValues.city, // $14
+        baseValues.state, // $15
+        baseValues.zip_code, // $16
+        baseValues.loan_amount, // $17
+        baseValues.loan_purpose, // $18
+        baseValues.loan_term, // $19
+
+        input.ipAddress, // $20
+        input.userAgent, // $21
+
+        resolvedStatus, // $22
+        id, // $23
+
+        encryptedSsn, // $24
+        encryptedDlNumber, // $25
+        encryptedAccountNumber, // $26
+        encryptedRoutingNumber, // $27
+
+        baseValues.time_at_current_address, // $28
+        baseValues.housing_status, // $29
+        baseValues.employment_status, // $30
+        baseValues.primary_income_type, // $31
+        baseValues.net_monthly_income, // $32
+        baseValues.pay_frequency, // $33
+        baseValues.direct_deposit, // $34
+        baseValues.additional_monthly_income, // $35
+        baseValues.additional_income_source, // $36
+
+        baseValues.loan_purpose_other_detail, // $37
+        timeAtCurrentJob, // $38
       ],
     );
   }
 
-  // const accountAge =
-  //   (
-  //     {
-  //       "Under 6 months": "under_6_months",
-  //       "1 Year": "1_year",
-  //       "2 Years": "2_years",
-  //       "3 Years": "3_years",
-  //       "4 Years": "4_years",
-  //       "5 years +": "5_plus_years",
-  //     } as Record<string, string>
-  //   )[String(mergedData.accountAge)] || null;
-  const accountAge = String(mergedData.accountAge || "").trim() || null;
+  // ============================================================
+  // 17. INSERT NEW APPLICATION
+  // ============================================================
+  else {
+    await query(
+      `INSERT INTO loan_applications (
+        id,
+        application_id,
+        session_id,
+        application_data,
+        step_number,
+        current_step,
 
-  console.log("[bank] accountAge raw:", mergedData.accountAge);
-  console.log("[bank] accountAge to DB:", accountAge);
-  const bankBalanceStatus =
-    (
-      { Positive: "positive_balance", Negative: "overdrawn" } as Record<
-        string,
-        string
-      >
-    )[String(mergedData.accountStatus)] || null;
-  const accountType =
-    String(mergedData.accountType || "").toLowerCase() || null;
-  const timeAtCurrentJob =
-    (
-      {
-        "Under 6 months": "6_11_months",
-        "3–5 months": "3_5_months",
-        "6–11 months": "6_11_months",
-        "1–2 years": "1_2_years",
-        "3–5 years": "3_5_years",
-        "5+ years": "5_plus_years",
-      } as Record<string, string>
-    )[String(mergedData.timeAtJob)] || null;
-  const nextPayDate = mergedData.nextPayDate
-    ? new Date(String(mergedData.nextPayDate)).toISOString().slice(0, 10)
-    : null;
+        first_name,
+        last_name,
+        email,
+        phone,
+        date_of_birth,
+
+        street_address,
+        city,
+        state,
+        zip_code,
+
+        loan_amount,
+        loan_purpose,
+        loan_purpose_other_detail,
+        loan_term,
+
+        time_at_current_address,
+        housing_status,
+        employment_status,
+        primary_income_type,
+
+        net_monthly_income,
+        pay_frequency,
+        direct_deposit,
+
+        additional_monthly_income,
+        additional_income_source,
+
+        ssn_encrypted,
+        dl_number_encrypted,
+        account_number_encrypted,
+        routing_number_encrypted,
+
+        ip_address,
+        user_agent,
+        page_url,
+        referrer_url,
+
+        step1_started_at,
+        step1_submitted_at,
+        step2_submitted_at,
+        step3_submitted_at,
+
+        total_time_on_form,
+        status,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        $1,
+        $2,
+        $3,
+        $4::jsonb,
+        $5,
+        $6,
+
+        $7,
+        $8,
+        $9,
+        $10,
+        $11,
+
+        $12,
+        $13,
+        $14,
+        $15,
+
+        $16,
+        $17,
+        $18,
+        $19,
+
+        $20,
+        $21,
+        $22,
+        $23,
+
+        $24,
+        $25,
+        $26,
+
+        $27,
+        $28,
+
+        $29,
+        $30,
+        $31,
+        $32,
+
+        $33,
+        $34,
+        $35,
+        $36,
+
+        $37,
+        $38,
+        $39,
+        $40,
+
+        0,
+        $41,
+        NOW(),
+        NOW()
+      )`,
+      [
+        id, // $1
+        applicationId, // $2
+        input.sessionId, // $3
+        JSON.stringify(applicationData), // $4
+        input.step, // $5
+        stepMap[input.step as 1 | 2 | 3], // $6
+
+        baseValues.first_name, // $7
+        baseValues.last_name, // $8
+        baseValues.email, // $9
+        baseValues.phone, // $10
+        baseValues.date_of_birth, // $11
+
+        baseValues.street_address, // $12
+        baseValues.city, // $13
+        baseValues.state, // $14
+        baseValues.zip_code, // $15
+
+        baseValues.loan_amount, // $16
+        baseValues.loan_purpose, // $17
+        baseValues.loan_purpose_other_detail, // $18
+        baseValues.loan_term, // $19
+
+        baseValues.time_at_current_address, // $20
+        baseValues.housing_status, // $21
+        baseValues.employment_status, // $22
+        baseValues.primary_income_type, // $23
+
+        baseValues.net_monthly_income, // $24
+        baseValues.pay_frequency, // $25
+        baseValues.direct_deposit, // $26
+
+        baseValues.additional_monthly_income, // $27
+        baseValues.additional_income_source, // $28
+
+        encryptedSsn, // $29
+        encryptedDlNumber, // $30
+        encryptedAccountNumber, // $31
+        encryptedRoutingNumber, // $32
+
+        input.ipAddress, // $33
+        input.userAgent, // $34
+        input.pageUrl || "", // $35
+        input.referrerUrl || "", // $36
+
+        applicationData.step1StartedAt || null, // $37
+        input.step === 1 ? new Date().toISOString() : null, // $38
+        input.step === 2 ? new Date().toISOString() : null, // $39
+        input.step === 3 ? new Date().toISOString() : null, // $40
+
+        resolvedStatus, // $41
+      ],
+    );
+  }
+
+  // ============================================================
+  // 18. UPDATE BANK / EMPLOYMENT / CONSENT FIELDS
+  // ============================================================
 
   await query(
     `UPDATE loan_applications
-     SET middle_initial = NULLIF($2, ''),
-         suffix = NULLIF($3, ''),
-         apt_unit_suite = NULLIF($4, ''),
-         monthly_housing_payment = COALESCE(NULLIF($5, '')::numeric, 0),
-         employer_name = NULLIF($6, ''),
-         job_title = NULLIF($7, ''),
-         employer_phone = NULLIF($8, ''),
-         time_at_current_job = NULLIF($9, ''),
-         next_pay_date = $10::date,
-         dl_state = NULLIF($11, ''),
-         dl_expiration_date = $12::date,
-         bank_name = NULLIF($13, ''),
-         bank_account_age = COALESCE($14, bank_account_age),
-         bank_balance_status = $15,
-         account_type = $16,
-         ssn_hash = COALESCE(NULLIF($17, ''), ssn_hash),
-         plaid_item_id = NULLIF($18, ''),
-         plaid_account_id = NULLIF($19, ''),
-         plaid_account_mask = NULLIF($20, ''),
-         plaid_account_type = NULLIF($21, ''),
-         bank_verification_completed = CASE WHEN $22 = true THEN true ELSE bank_verification_completed END,
-         tcpa_consent = COALESCE($23, false),
-         esign_consent = COALESCE($24, false),
-         privacy_consent = COALESCE($25, false),
-         soft_credit_pull_consent = COALESCE($26, false),
-         hard_credit_pull_consent = COALESCE($27, false),
-         ach_authorization_consent = COALESCE($28, false),
-         updated_at = NOW()
+     SET
+       middle_initial =
+         NULLIF($2, ''),
+
+       suffix =
+         NULLIF($3, ''),
+
+       apt_unit_suite =
+         NULLIF($4, ''),
+
+       monthly_housing_payment =
+         COALESCE(
+           NULLIF($5, '')::numeric,
+           monthly_housing_payment
+         ),
+
+       employer_name =
+         NULLIF($6, ''),
+
+       job_title =
+         NULLIF($7, ''),
+
+       employer_phone =
+         NULLIF($8, ''),
+
+       time_at_current_job =
+         COALESCE(
+           NULLIF($9, ''),
+           time_at_current_job
+         ),
+
+       next_pay_date =
+         $10::date,
+
+       dl_state =
+         NULLIF($11, ''),
+
+       dl_expiration_date =
+         $12::date,
+
+       bank_name =
+         NULLIF($13, ''),
+
+       bank_account_age =
+         COALESCE(
+           $14,
+           bank_account_age
+         ),
+
+       bank_balance_status =
+         COALESCE(
+           $15,
+           bank_balance_status
+         ),
+
+       account_type =
+         COALESCE(
+           $16,
+           account_type
+         ),
+
+       ssn_hash =
+         COALESCE(
+           NULLIF($17, ''),
+           ssn_hash
+         ),
+
+       plaid_item_id =
+         COALESCE(
+           NULLIF($18, ''),
+           plaid_item_id
+         ),
+
+       plaid_account_id =
+         COALESCE(
+           NULLIF($19, ''),
+           plaid_account_id
+         ),
+
+       plaid_account_mask =
+         COALESCE(
+           NULLIF($20, ''),
+           plaid_account_mask
+         ),
+
+       plaid_account_type =
+         COALESCE(
+           NULLIF($21, ''),
+           plaid_account_type
+         ),
+
+       bank_verification_completed =
+         CASE
+           WHEN $22 = true
+           THEN true
+           ELSE bank_verification_completed
+         END,
+
+       tcpa_consent =
+         COALESCE(
+           $23,
+           tcpa_consent
+         ),
+
+       esign_consent =
+         COALESCE(
+           $24,
+           esign_consent
+         ),
+
+       privacy_consent =
+         COALESCE(
+           $25,
+           privacy_consent
+         ),
+
+       soft_credit_pull_consent =
+         COALESCE(
+           $26,
+           soft_credit_pull_consent
+         ),
+
+       hard_credit_pull_consent =
+         COALESCE(
+           $27,
+           hard_credit_pull_consent
+         ),
+
+       ach_authorization_consent =
+         COALESCE(
+           $28,
+           ach_authorization_consent
+         ),
+
+       updated_at = NOW()
+
      WHERE id = $1`,
     [
       id, // $1
@@ -673,28 +1231,52 @@ export async function saveApplicationStep(
       String(mergedData.employerName || ""), // $6
       String(mergedData.jobTitle || ""), // $7
       String(mergedData.employerPhone || ""), // $8
+
       timeAtCurrentJob || "", // $9
+
       nextPayDate, // $10
+
       String(mergedData.dlState || ""), // $11
+
       mergedData.dlExpiration || null, // $12
+
       String(mergedData.bankName || ""), // $13
+
       accountAge, // $14
+
       bankBalanceStatus, // $15
+
       accountType, // $16
+
       ssnHash, // $17
+
       String(plaidDetails.itemId || ""), // $18
+
       String(plaidDetails.accountId || ""), // $19
+
       String(plaidDetails.accountMask || ""), // $20
+
       String(plaidDetails.accountType || ""), // $21
+
       Boolean(mergedData.bankAuthMode === "instant"), // $22
+
       Boolean(mergedData.tcpaConsent), // $23
+
       Boolean(mergedData.esignConsent), // $24
+
       Boolean(mergedData.privacyConsent), // $25
+
       Boolean(mergedData.softCreditConsent), // $26
+
       Boolean(mergedData.hardCreditConsent), // $27
+
       Boolean(mergedData.achConsent), // $28
     ],
   );
+
+  // ============================================================
+  // 19. DRIP SEQUENCE
+  // ============================================================
 
   if (resolvedStatus === "bank_verification_completed") {
     await cancelDripSequence(id, ["verify", "call"]);
@@ -702,7 +1284,15 @@ export async function saveApplicationStep(
     await enqueueDripSequence(id, new Date());
   }
 
-  return { applicationId, status: resolvedStatus, derivedData };
+  // ============================================================
+  // 20. RETURN
+  // ============================================================
+
+  return {
+    applicationId,
+    status: resolvedStatus,
+    derivedData,
+  };
 }
 
 export interface ApplicationRow {
