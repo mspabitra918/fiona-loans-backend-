@@ -421,7 +421,7 @@ export async function saveApplicationStep(
 
     // IMPORTANT
     loan_purpose_other_detail: String(
-      mergedData.loanPurposeOtherDetail ||
+      mergedData.purposeOtherDetail ||
         mergedData.loan_purpose_other_detail ||
         "",
     ).trim(),
