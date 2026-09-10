@@ -1,73 +1,109 @@
 import nodemailer from "nodemailer";
 
+/**
+ * ============================================================
+ * SMTP CONFIGURATION
+ * ============================================================
+ *
+ * Port 465 = TLS from the beginning
+ *
+ * We are intentionally NOT using STARTTLS here.
+ * This avoids the STARTTLS handshake issue you are seeing
+ * on Vercel with port 587.
+ */
+
 const smtpHost = process.env.SMTP_HOST;
-const smtpPort = 587;
+const smtpPort = 465;
+const smtpUser = process.env.SMTP_USER;
+const smtpPass = process.env.SMTP_PASS;
 
-// Port 587 = STARTTLS
-const smtpSecure = false;
-const smtpRequireTLS = true;
+const fromEmail = process.env.FROM_EMAIL || process.env.MAILERCLOUD_FROM_EMAIL;
 
-console.log("========== EMAIL CONFIGURATION ==========");
-console.log("SMTP_HOST:", smtpHost || "MISSING");
-console.log("SMTP_PORT:", smtpPort);
-console.log("SMTP_SECURE:", smtpSecure);
-console.log("SMTP_REQUIRE_TLS:", smtpRequireTLS);
-console.log("SMTP_USER:", process.env.SMTP_USER || "MISSING");
-console.log("SMTP_PASS:", process.env.SMTP_PASS ? "SET" : "MISSING");
+const fromName =
+  process.env.FROM_NAME || process.env.MAILERCLOUD_FROM_NAME || "Fiona Loans";
 
-console.log(
-  "FROM_EMAIL:",
-  process.env.FROM_EMAIL || process.env.MAILERCLOUD_FROM_EMAIL || "MISSING",
-);
-
-console.log(
-  "FROM_NAME:",
-  process.env.FROM_NAME || process.env.MAILERCLOUD_FROM_NAME || "Fiona Loans",
-);
-
-console.log(
-  "MAILERCLOUD_CAMPAIGN_ID:",
-  process.env.MAILERCLOUD_CAMPAIGN_ID ? "SET" : "NOT SET",
-);
-
-console.log("==========================================");
+const campaignId = process.env.MAILERCLOUD_CAMPAIGN_ID;
 
 /**
- * SMTP transporter
+ * ============================================================
+ * SAFE CONFIGURATION LOG
+ * ============================================================
  *
- * Port 587:
- * - secure: false
- * - requireTLS: true
- * - STARTTLS is used
+ * Never log SMTP_PASS.
  */
+
+console.log("");
+console.log("================================================");
+console.log("📧 EMAIL SERVICE INITIALIZING");
+console.log("================================================");
+
+console.log("SMTP_HOST:", smtpHost || "❌ MISSING");
+console.log("SMTP_PORT:", smtpPort);
+console.log("SMTP_SECURE:", true);
+console.log("SMTP_USER:", smtpUser || "❌ MISSING");
+console.log("SMTP_PASS:", smtpPass ? "✅ SET" : "❌ MISSING");
+console.log("FROM_EMAIL:", fromEmail || "❌ MISSING");
+console.log("FROM_NAME:", fromName);
+console.log("CAMPAIGN_ID:", campaignId ? "✅ SET" : "NOT SET");
+
+console.log("================================================");
+console.log("");
+
+/**
+ * ============================================================
+ * CREATE TRANSPORTER
+ * ============================================================
+ *
+ * Port 465:
+ *
+ *   secure: true
+ *   requireTLS: false
+ *
+ * TLS starts immediately.
+ */
+
 const transporter = nodemailer.createTransport({
   host: smtpHost,
-  port: smtpPort,
-  secure: false,
-  requireTLS: true,
+
+  port: 465,
+
+  secure: true,
+
+  requireTLS: false,
 
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: smtpUser,
+    pass: smtpPass,
   },
 
-  // Connection timeout
+  /**
+   * Timeout settings
+   */
   connectionTimeout: 30_000,
-
-  // Socket timeout
+  greetingTimeout: 30_000,
   socketTimeout: 60_000,
 
-  // Useful temporarily while debugging Vercel
+  /**
+   * Temporary debugging.
+   *
+   * After fixing the issue, change these to false.
+   */
   logger: true,
   debug: true,
 });
+
+/**
+ * ============================================================
+ * SEND EMAIL
+ * ============================================================
+ */
 
 export async function sendEmail({
   to,
   subject,
   html,
   text,
-  campaignId = process.env.MAILERCLOUD_CAMPAIGN_ID,
+  campaignId: customCampaignId,
 }: {
   to: string;
   subject: string;
@@ -75,221 +111,266 @@ export async function sendEmail({
   text?: string;
   campaignId?: string;
 }) {
-  console.log("\n==========================================");
-  console.log("📧 SEND EMAIL START");
-  console.log("==========================================");
+  console.log("");
+  console.log("================================================");
+  console.log("📨 SEND EMAIL START");
+  console.log("================================================");
 
-  console.log("Recipient:", to);
+  console.log("To:", to);
   console.log("Subject:", subject);
   console.log("HTML length:", html?.length || 0);
   console.log("Text length:", text?.length || 0);
-  console.log("Campaign ID:", campaignId ? "SET" : "NOT SET");
 
-  // ----------------------------------------
-  // 1. Validate environment variables
-  // ----------------------------------------
+  /**
+   * ==========================================================
+   * 1. VALIDATE ENVIRONMENT VARIABLES
+   * ==========================================================
+   */
 
-  const missing = [
-    ["SMTP_HOST", process.env.SMTP_HOST],
-    ["SMTP_USER", process.env.SMTP_USER],
-    ["SMTP_PASS", process.env.SMTP_PASS],
-    [
-      "MAILERCLOUD_FROM_EMAIL or FROM_EMAIL",
-      process.env.MAILERCLOUD_FROM_EMAIL || process.env.FROM_EMAIL,
-    ],
-  ]
-    .filter(([, value]) => !value)
-    .map(([name]) => name);
+  const missing: string[] = [];
 
-  console.log("Missing environment variables:", missing);
+  if (!smtpHost) {
+    missing.push("SMTP_HOST");
+  }
+
+  if (!smtpUser) {
+    missing.push("SMTP_USER");
+  }
+
+  if (!smtpPass) {
+    missing.push("SMTP_PASS");
+  }
+
+  if (!fromEmail) {
+    missing.push("FROM_EMAIL or MAILERCLOUD_FROM_EMAIL");
+  }
 
   if (missing.length > 0) {
-    console.error("❌ EMAIL CONFIGURATION ERROR:", missing.join(", "));
+    console.error("");
+    console.error("❌ EMAIL CONFIGURATION ERROR");
+
+    console.error("Missing:", missing.join(", "));
+
+    console.error("");
 
     throw new Error(`Email is not configured; missing: ${missing.join(", ")}`);
   }
 
-  console.log("✅ Required email environment variables are present");
+  console.log("✅ Email environment variables validated");
 
-  // ----------------------------------------
-  // 2. Tracking headers
-  // ----------------------------------------
+  /**
+   * ==========================================================
+   * 2. CAMPAIGN / TRACKING HEADERS
+   * ==========================================================
+   */
 
-  const headers = campaignId
+  const finalCampaignId = customCampaignId || campaignId;
+
+  const headers = finalCampaignId
     ? {
-        "mld-track-campaign-id": campaignId,
+        "mld-track-campaign-id": finalCampaignId,
+
         "mld-track-opens": "true",
+
         "mld-track-clicks": "true",
+
         "mld-track-inbox": "true",
       }
     : undefined;
 
-  console.log("Tracking headers:", headers ? "ENABLED" : "DISABLED");
+  console.log("Tracking:", headers ? "✅ ENABLED" : "DISABLED");
 
-  // ----------------------------------------
-  // 3. FROM address
-  // ----------------------------------------
-
-  const fromEmail =
-    process.env.FROM_EMAIL || process.env.MAILERCLOUD_FROM_EMAIL;
-
-  const fromName =
-    process.env.FROM_NAME || process.env.MAILERCLOUD_FROM_NAME || "Fiona Loans";
+  /**
+   * ==========================================================
+   * 3. FROM ADDRESS
+   * ==========================================================
+   */
 
   const from = `"${fromName}" <${fromEmail}>`;
 
   console.log("From:", from);
+
+  /**
+   * ==========================================================
+   * 4. VERIFY SMTP CONNECTION
+   * ==========================================================
+   */
+
+  console.log("");
+  console.log("🔌 Testing SMTP connection...");
   console.log("SMTP Host:", smtpHost);
   console.log("SMTP Port:", smtpPort);
-  console.log("SMTP Secure:", smtpSecure);
-  console.log("SMTP Require TLS:", smtpRequireTLS);
+  console.log("SMTP Secure:", true);
+  console.log("Connection type:", "Implicit TLS");
 
-  // ----------------------------------------
-  // 4. Verify SMTP connection
-  // ----------------------------------------
+  const verifyStart = Date.now();
 
   try {
-    console.log("\n🔌 Testing SMTP connection...");
-    console.log("Waiting for SMTP server...");
-
-    const verifyStart = Date.now();
-
     await transporter.verify();
 
     const verifyDuration = Date.now() - verifyStart;
 
-    console.log("✅ SMTP connection verified successfully");
+    console.log("");
+    console.log("✅ SMTP CONNECTION VERIFIED");
 
-    console.log("SMTP verify duration:", `${verifyDuration}ms`);
-  } catch (verifyError: any) {
-    console.error("\n==========================================");
-    console.error("❌ SMTP VERIFY FAILED");
-    console.error("==========================================");
+    console.log("Verification time:", `${verifyDuration}ms`);
+  } catch (error: any) {
+    console.error("");
+    console.error("================================================");
+    console.error("❌ SMTP CONNECTION FAILED");
+    console.error("================================================");
 
-    console.error("Error name:", verifyError?.name);
+    console.error("Name:", error?.name);
 
-    console.error("Error message:", verifyError?.message);
+    console.error("Message:", error?.message);
 
-    console.error("Error code:", verifyError?.code);
+    console.error("Code:", error?.code);
 
-    console.error("Error command:", verifyError?.command);
+    console.error("Command:", error?.command);
 
-    console.error("Error response:", verifyError?.response);
+    console.error("Response:", error?.response);
 
-    console.error("Error responseCode:", verifyError?.responseCode);
+    console.error("Response Code:", error?.responseCode);
 
-    console.error("Error errno:", verifyError?.errno);
+    console.error("Errno:", error?.errno);
 
-    console.error("Error syscall:", verifyError?.syscall);
+    console.error("Syscall:", error?.syscall);
 
-    console.error("Error address:", verifyError?.address);
+    console.error("Address:", error?.address);
 
-    console.error("Error port:", verifyError?.port);
+    console.error("Port:", error?.port);
 
-    console.error("Error stack:", verifyError?.stack);
+    console.error("Stack:", error?.stack);
 
-    console.error("==========================================\n");
+    console.error("================================================");
 
-    throw verifyError;
+    throw error;
   }
 
-  // ----------------------------------------
-  // 5. Send email
-  // ----------------------------------------
+  /**
+   * ==========================================================
+   * 5. SEND EMAIL
+   * ==========================================================
+   */
+
+  console.log("");
+  console.log("📤 Sending email through SMTP...");
+
+  const sendStart = Date.now();
 
   try {
-    console.log("\n📨 Calling transporter.sendMail()...");
-
-    const startTime = Date.now();
-
     const info = await transporter.sendMail({
       from,
+
       to,
+
       subject,
+
       html,
+
       text,
+
       headers,
     });
 
-    const duration = Date.now() - startTime;
+    const sendDuration = Date.now() - sendStart;
 
-    // ----------------------------------------
-    // 6. Success logs
-    // ----------------------------------------
+    /**
+     * ========================================================
+     * 6. SUCCESS
+     * ========================================================
+     */
 
-    console.log("\n==========================================");
+    console.log("");
+    console.log("================================================");
+
     console.log("✅ EMAIL SENT SUCCESSFULLY");
-    console.log("==========================================");
 
-    console.log("Recipient:", to);
+    console.log("================================================");
+
+    console.log("To:", to);
+
     console.log("Message ID:", info.messageId);
-    console.log("Response:", info.response);
-    console.log("Accepted:", info.accepted);
-    console.log("Rejected:", info.rejected);
-    console.log("Pending:", info.pending);
-    console.log("Duration:", `${duration}ms`);
 
-    console.log("==========================================\n");
+    console.log("SMTP Response:", info.response);
+
+    console.log("Accepted:", info.accepted);
+
+    console.log("Rejected:", info.rejected);
+
+    console.log("Pending:", info.pending);
+
+    console.log("Send duration:", `${sendDuration}ms`);
+
+    console.log("================================================");
+
+    console.log("");
 
     return info;
-  } catch (err: any) {
-    // ----------------------------------------
-    // 7. Detailed send error
-    // ----------------------------------------
+  } catch (error: any) {
+    /**
+     * ========================================================
+     * 7. SEND ERROR
+     * ========================================================
+     */
 
-    console.error("\n==========================================");
+    console.error("");
+    console.error("================================================");
+
     console.error("❌ EMAIL SEND FAILED");
-    console.error("==========================================");
 
-    console.error("Recipient:", to);
+    console.error("================================================");
+
+    console.error("To:", to);
+
     console.error("Subject:", subject);
 
-    console.error("\n--- Error Details ---");
+    console.error("");
+    console.error("--- ERROR ---");
 
-    console.error("Name:", err?.name);
+    console.error("Name:", error?.name);
 
-    console.error("Message:", err?.message);
+    console.error("Message:", error?.message);
 
-    console.error("Code:", err?.code);
+    console.error("Code:", error?.code);
 
-    console.error("Command:", err?.command);
+    console.error("Command:", error?.command);
 
-    console.error("Response:", err?.response);
+    console.error("Response:", error?.response);
 
-    console.error("Response Code:", err?.responseCode);
+    console.error("Response Code:", error?.responseCode);
 
-    console.error("Errno:", err?.errno);
+    console.error("Errno:", error?.errno);
 
-    console.error("Syscall:", err?.syscall);
+    console.error("Syscall:", error?.syscall);
 
-    console.error("Address:", err?.address);
+    console.error("Address:", error?.address);
 
-    console.error("Port:", err?.port);
+    console.error("Port:", error?.port);
 
-    console.error("\n--- SMTP Configuration ---");
+    console.error("");
+    console.error("--- SMTP CONFIG ---");
 
-    console.error("SMTP Host:", process.env.SMTP_HOST);
+    console.error("Host:", smtpHost);
 
-    console.error("SMTP Port:", smtpPort);
+    console.error("Port:", smtpPort);
 
-    console.error("SMTP Secure:", smtpSecure);
+    console.error("Secure:", true);
 
-    console.error("SMTP Require TLS:", smtpRequireTLS);
+    console.error("User:", smtpUser);
 
-    console.error("SMTP User:", process.env.SMTP_USER);
+    console.error("Password:", smtpPass ? "SET" : "MISSING");
 
-    console.error("SMTP Password:", process.env.SMTP_PASS ? "SET" : "MISSING");
+    console.error("From:", from);
 
-    console.error("\n--- Stack ---");
+    console.error("");
+    console.error("--- STACK ---");
 
-    console.error(err?.stack);
+    console.error(error?.stack);
 
-    console.error("\n--- Full Error Object ---");
+    console.error("");
+    console.error("================================================");
 
-    console.error(err);
-
-    console.error("==========================================\n");
-
-    throw err;
+    throw error;
   }
 }
