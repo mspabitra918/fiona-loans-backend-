@@ -12,7 +12,12 @@
     "seed": "tsx src/seedAdmin.ts"
   },
   "dependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.20.2",
+    "@types/nodemailer": "^8.0.1",
+    "@types/pg": "^8.23.1",
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.76.10",
@@ -30,12 +35,7 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.0",
     "@types/json2csv": "^5.0.7",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/nodemailer": "^8.0.1",
-    "@types/pg": "^8.23.1",
     "tsx": "^4.20.0",
     "typescript": "^5.9.3"
   }
