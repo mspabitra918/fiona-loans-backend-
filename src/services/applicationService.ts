@@ -1316,7 +1316,7 @@ export interface ApplicationRow {
   employment_status: string;
   employer_name: string;
   job_title: string;
-  monthly_income: number;
+  net_monthly_income: number;
   years_employed: number;
   loan_amount: number;
   loan_purpose: string;
@@ -1364,7 +1364,7 @@ export interface ApplicationRowExport {
   employment_status: string;
   employer_name: string;
   job_title: string;
-  monthly_income: number;
+  net_monthly_income: number;
   years_employed: number;
   loan_amount: number;
   loan_purpose: string;

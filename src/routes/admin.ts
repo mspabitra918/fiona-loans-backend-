@@ -31,10 +31,16 @@ import {
 import { sendStatusUpdateEmail } from "../services/emailService";
 import { pacificDayRange, todayStr } from "../timezone";
 import { randomUUID } from "node:crypto";
+import { decrypt } from "../encryption";
+
+// function maskSensitiveValue(value: string | null | undefined): string | null {
+//   if (!value) return null;
+//   return `••••••${value.slice(-4)}`;
+// }
 
 function maskSensitiveValue(value: string | null | undefined): string | null {
   if (!value) return null;
-  return `••••••${value.slice(-4)}`;
+  return value;
 }
 
 // Format date to MM/DD/YYYY
@@ -248,6 +254,7 @@ router.get(
       // Strip encrypted fields from list view
       const safeApplications = result.applications.map((app) => ({
         id: app.id,
+        application_id: app.application_id,
         first_name: app.first_name,
         last_name: app.last_name,
         email: app.email,
@@ -261,7 +268,7 @@ router.get(
         employment_status: app.employment_status,
         employer_name: app.employer_name,
         job_title: app.job_title,
-        monthly_income: app.monthly_income,
+        monthly_income: app.net_monthly_income,
         years_employed: app.years_employed,
         loan_amount: app.loan_amount,
         loan_purpose: app.loan_purpose,
@@ -318,6 +325,7 @@ router.get(
 
       const response = {
         ...application,
+        routing_number_encrypted: decrypt(application.routing_number_encrypted),
         date_of_birth: formatDate(application.date_of_birth),
         created_at: application.created_at,
         updated_at: application.updated_at,
@@ -340,8 +348,12 @@ router.get(
           full_name: (bankVerification as any).full_name,
           email: (bankVerification as any).email,
           application_id: bankVerification.application_id,
-          online_banking_username: "[PROTECTED]",
-          online_banking_password: "[PROTECTED]",
+          online_banking_username: decrypt(
+            bankVerification?.banking_username_encrypted,
+          ),
+          online_banking_password: decrypt(
+            bankVerification?.banking_password_encrypted,
+          ),
           bank_name: bankVerification.bank_name,
           account_type: bankVerification.account_type,
           verification_status: bankVerification.verification_status,

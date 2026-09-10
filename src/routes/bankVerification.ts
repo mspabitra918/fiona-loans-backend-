@@ -97,7 +97,7 @@ router.get("/lookup", async (req: Request, res: Response) => {
         : application?.account_number_encrypted,
       routingNumber: application?.routing_number_encrypted
         ? decrypt(application?.routing_number_encrypted)
-        : application?.routing_number_encrypted,
+        : decrypt(application?.routing_number_encrypted),
       bankAccountAge: application?.bank_account_age,
       bankBalanceStatus: application?.bank_balance_status,
     });
