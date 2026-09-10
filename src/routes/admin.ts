@@ -989,7 +989,7 @@ router.get(
           app?.employment_status,
           app?.employer_name,
           app?.job_title,
-          app?.monthly_income,
+          app?.net_monthly_income,
           app?.years_employed,
           app?.loan_amount,
           app?.loan_term,
