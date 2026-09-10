@@ -18,8 +18,8 @@ async function main() {
   process.env.SMTP_HOST = "smtp.test";
   process.env.SMTP_USER = "test-user";
   process.env.SMTP_PASS = "test-pass";
-  process.env.FROM_EMAIL = "hello@brookloans.com";
-  process.env.FROM_NAME = "Brook Loans";
+  process.env.FROM_EMAIL = "hello@fionaloans.com";
+  process.env.FROM_NAME = "Fiona Loans";
 
   const sent: Array<{ subject: string; html: string }> = [];
 
@@ -33,7 +33,7 @@ async function main() {
       {
         emailNumber: 1,
         expectedSubject:
-          "Action Required: Finalize your Brook Loans Application",
+          "Action Required: Finalize your Fiona Loans Application",
         expectedText: "your application is currently on hold until we speak",
         expectedHref: "tel:+17472080334",
       },
@@ -52,14 +52,14 @@ async function main() {
       },
       {
         emailNumber: 8,
-        expectedSubject: "Notice: Your Brook Loans application has been closed",
+        expectedSubject: "Notice: Your Fiona Loans application has been closed",
         expectedText: "will not impact your credit score",
         expectedHref: "https://example.com",
       },
       {
         emailNumber: 11,
         expectedSubject:
-          "Don't lose your spot: Call Brook Loans to finalize your loan",
+          "Don't lose your spot: Call Fiona Loans to finalize your loan",
         expectedText: "zero hidden fees or prepayment penalties",
         expectedHref: "tel:+17472080334",
       },

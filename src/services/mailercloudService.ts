@@ -54,7 +54,7 @@ export async function sendEmail({
 
   try {
     const info = await transporter.sendMail({
-      from: `"${process.env.FROM_NAME || process.env.MAILERCLOUD_FROM_NAME || "Brook Loans"}" <${process.env.FROM_EMAIL || process.env.MAILERCLOUD_FROM_EMAIL}>`,
+      from: `"${process.env.FROM_NAME || process.env.MAILERCLOUD_FROM_NAME || "Fiona Loans"}" <${process.env.FROM_EMAIL || process.env.MAILERCLOUD_FROM_EMAIL}>`,
       to,
       subject,
       html,

@@ -6,8 +6,8 @@ async function main() {
   process.env.SMTP_HOST = "smtp.test";
   process.env.SMTP_USER = "test-user";
   process.env.SMTP_PASS = "test-pass";
-  process.env.FROM_EMAIL = "hello@brookloans.com";
-  process.env.FROM_NAME = "Brook Loans";
+  process.env.FROM_EMAIL = "hello@fionaloans.com";
+  process.env.FROM_NAME = "Fiona Loans";
 
   const sent: Array<{ subject: string; html: string }> = [];
 
@@ -30,7 +30,7 @@ async function main() {
       },
       {
         status: "request_a_call",
-        expectedSubject: "URGENT: Please call Brook Loans immediately",
+        expectedSubject: "URGENT: Please call Fiona Loans immediately",
         expectedText: "Please call us ASAP",
       },
       {
@@ -45,8 +45,8 @@ async function main() {
       },
       {
         status: "funded",
-        expectedSubject: "Great News! Your Brook Loans application is FUNDED",
-        expectedText: "Welcome to the Brook Loans family!",
+        expectedSubject: "Great News! Your Fiona Loans application is FUNDED",
+        expectedText: "Welcome to the Fiona Loans family!",
       },
     ] as const;
 

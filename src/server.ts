@@ -35,10 +35,10 @@ app.use((_req, res, next) => {
 app.use(
   cors({
     origin: [
-      "https://www.brookloans.com",
-      "https://brookloans.com",
-      "www.brookloans.com",
-      "brookloans.com",
+      "https://www.fionaloans.com",
+      "https://fionaloans.com",
+      "www.fionaloans.com",
+      "fionaloans.com",
       process.env.FRONTEND_URL || "http://localhost:3000",
     ],
     credentials: true,
@@ -69,7 +69,7 @@ app.use(sitemapRoutes);
 app.get("/", (_req, res) => {
   res.json({
     status: "OK",
-    message: "Brook Loans API is running",
+    message: "Fiona Loans API is running",
   });
 });
 
@@ -92,7 +92,7 @@ app.use(
 // Only listen when running locally (not on Vercel)
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {
-    console.log(`Brook Loans Backend running on http://localhost:${PORT}`);
+    console.log(`Fiona Loans Backend running on http://localhost:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
   });
 }

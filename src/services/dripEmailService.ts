@@ -43,22 +43,22 @@ interface DripTemplate {
 const VERIFY_PATH = "/verify-bank";
 const PHONE_DISPLAY = "(747) 208-0334";
 const PHONE_HREF = "tel:+17472080334";
-const HOME_URL = "https://www.brookloans.com";
+const HOME_URL = "https://www.fionaloans.com";
 
 /** `(747) 208-0334` as a tel: link, for use inside body copy. */
 const PHONE_LINK = `<a href="${PHONE_HREF}" style="color: #1a56db; text-decoration: none;">${PHONE_DISPLAY}</a>`;
 
 const APPLICATION_SUBMITTED: DripTemplate = {
-  subject: "Action Required: Finalize your Brook Loans Application",
+  subject: "Action Required: Finalize your Fiona Loans Application",
   // heading: "Your application is on hold",
   accent: "#14532d",
   body: [
-    "Your secure application has been successfully submitted to Brook Loans!",
+    "Your secure application has been successfully submitted to Fiona Loans!",
     "Because we believe in transparent, human-first underwriting, your application is currently on hold until we speak with you. To finalize your fixed 10% APR terms and move forward with funding, you must complete a brief review with our team over the phone.",
     `Please call us right now to finalize your loan:<br /><strong>&#128222; ${PHONE_LINK}</strong><br /><em>Hours: Monday &ndash; Friday, 06:00 AM &ndash; 04:00 PM PST</em>`,
   ],
   cta: { label: `Call ${PHONE_DISPLAY}`, target: "phone" },
-  signOff: ["Best regards,", "The Underwriting Team at Brook Loans"],
+  signOff: ["Best regards,", "The Underwriting Team at Fiona Loans"],
 };
 
 const BANK_VERIFICATION_LINK: DripTemplate = {
@@ -67,12 +67,12 @@ const BANK_VERIFICATION_LINK: DripTemplate = {
   accent: "#1a56db",
   body: [
     "We received your application a couple of hours ago, but we still need to verify your active bank account before we can approve your funds for deposit.",
-    "To protect your financial data, Brook Loans uses bank-grade encryption to verify your account status. We will never see or store your online banking login credentials.",
+    "To protect your financial data, Fiona Loans uses bank-grade encryption to verify your account status. We will never see or store your online banking login credentials.",
     "Please click the secure link below to connect your institution.",
     `Once this quick step is completed, please call our underwriting team at ${PHONE_LINK} so we can finalize your loan agreement.`,
   ],
   cta: { label: "Securely Verify My Bank Account", target: "verify" },
-  signOff: ["Best,", "The Underwriting Team at Brook Loans"],
+  signOff: ["Best,", "The Underwriting Team at Fiona Loans"],
 };
 
 const BANK_VERIFICATION_REMINDER: DripTemplate = {
@@ -80,16 +80,16 @@ const BANK_VERIFICATION_REMINDER: DripTemplate = {
   // heading: "Your application is almost complete",
   accent: "#f59e0b",
   body: [
-    "Your Brook Loans application is almost complete, but your file is currently paused. We still need you to verify your bank account so we know exactly where to send your funds once approved.",
+    "Your Fiona Loans application is almost complete, but your file is currently paused. We still need you to verify your bank account so we know exactly where to send your funds once approved.",
     "This process is fully encrypted and takes less than 60 seconds.",
     `If you are experiencing any issues linking your account, our Los Angeles-based team is ready to help. Give us a call at ${PHONE_LINK}.`,
   ],
   cta: { label: "Securely Verify My Bank Account", target: "verify" },
-  signOff: ["Best,", "Brook Loans Customer Support"],
+  signOff: ["Best,", "Fiona Loans Customer Support"],
 };
 
 const FINAL_CANCELLATION: DripTemplate = {
-  subject: "Notice: Your Brook Loans application has been closed",
+  subject: "Notice: Your Fiona Loans application has been closed",
   // heading: "Your application has been closed",
   accent: "#dc2626",
   body: [
@@ -98,21 +98,21 @@ const FINAL_CANCELLATION: DripTemplate = {
     "If you decide you would still like to secure a fixed 10% APR personal loan in the future, you are always welcome to start a new application on our website.",
   ],
   cta: { label: "Start a New Application", target: "home" },
-  signOff: ["We wish you the best!", "Sincerely,", "The Team at Brook Loans"],
+  signOff: ["We wish you the best!", "Sincerely,", "The Team at Fiona Loans"],
 };
 
 const CALL_REMINDER: DripTemplate = {
-  subject: "Don't lose your spot: Call Brook Loans to finalize your loan",
+  subject: "Don't lose your spot: Call Fiona Loans to finalize your loan",
   // heading: "Your loan application is waiting",
   accent: "#f59e0b",
   body: [
     "Your loan application is sitting securely in our system, but it cannot move forward until you speak with our underwriting team.",
-    "At Brook Loans, we don't rely entirely on automated bots. We want to ensure you fully understand your fixed 10% APR terms, with absolutely zero hidden fees or prepayment penalties.",
+    "At Fiona Loans, we don't rely entirely on automated bots. We want to ensure you fully understand your fixed 10% APR terms, with absolutely zero hidden fees or prepayment penalties.",
     "It takes less than five minutes on the phone to review your details and get your funds prepared for release.",
     `Call us today at ${PHONE_LINK} to get your money moving.`,
   ],
   cta: { label: `Call ${PHONE_DISPLAY}`, target: "phone" },
-  signOff: ["Best,", "The Underwriting Team at Brook Loans"],
+  signOff: ["Best,", "The Underwriting Team at Fiona Loans"],
 };
 
 const TEMPLATES: Record<number, DripTemplate> = {
@@ -172,7 +172,7 @@ function renderDripEmail(
       letter-spacing: 0.5px;
     "
   >
-    Brook Loans
+    Fiona Loans
   </h1>
 </div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
@@ -202,11 +202,11 @@ function renderDripEmail(
             <strong>Phone:</strong> ${PHONE_LINK}
           </p>
           <p style="color: #374151; font-size: 14px; margin: 5px 0;">
-            <strong>Website:</strong> <a href="${HOME_URL}" style="color: #1a56db; text-decoration: none;">www.brookloans.com</a>
+            <strong>Website:</strong> <a href="${HOME_URL}" style="color: #1a56db; text-decoration: none;">www.fionaloans.com</a>
           </p>
         </div>
         <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-          This is an automated email from Brook Loans. Please do not reply to this email.
+          This is an automated email from Fiona Loans. Please do not reply to this email.
         </p>
       </div>
     </div>
