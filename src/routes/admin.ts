@@ -226,7 +226,7 @@ router.get("/auth", async (req: Request, res: Response) => {
 // GET /api/admin/applications — List all applications
 router.get(
   "/applications",
-  // requireAuth(),
+  requireAuth(),
   async (req: AuthRequest, res: Response) => {
     try {
       // Default to today's date if no date param provided

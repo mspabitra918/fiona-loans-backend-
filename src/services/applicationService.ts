@@ -1663,7 +1663,11 @@ export async function listApplications(
     } else if (isNumericSearch) {
       // Phone / ID numeric lookup — strip formatting from stored phone
       conditions.push(
-        `(REGEXP_REPLACE(phone, '[^0-9]', '', 'g') ILIKE $${paramIndex} OR id::text ILIKE $${paramIndex})`,
+        `(
+      REGEXP_REPLACE(phone, '[^0-9]', '', 'g') ILIKE $${paramIndex}
+      OR id::text ILIKE $${paramIndex}
+      OR application_id::text ILIKE $${paramIndex}
+    )`,
       );
       params.push(`%${digitsOnly}%`);
       paramIndex++;
@@ -1679,6 +1683,7 @@ export async function listApplications(
             OR email ILIKE $${paramIndex}
             OR phone ILIKE $${paramIndex}
             OR id::text ILIKE $${paramIndex}
+            OR application_id::text ILIKE $${paramIndex}
             OR (first_name || ' ' || last_name) ILIKE $${paramIndex})`,
           );
           params.push(`%${word}%`);
