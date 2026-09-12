@@ -65,7 +65,7 @@ async function processDripJob(job: Job<DripJobData>): Promise<void> {
   }
 
   await sendDripEmail(emailNumber, {
-    applicationId: application.id,
+    applicationId: application.application_id,
     firstName: application.first_name,
     email: application.email,
     loanAmount: Number(application.loan_amount),
