@@ -15,6 +15,7 @@ import {
 } from "./services/applicationService";
 import { sendDripEmail } from "./services/dripEmailService";
 import { recordDripSent, hasDripBeenSent } from "./services/dripLogService";
+import { queryOne } from "./db";
 
 /**
  * Always-on BullMQ worker for the drip sequences (verification + call tracks).
@@ -32,8 +33,26 @@ import { recordDripSent, hasDripBeenSent } from "./services/dripLogService";
  */
 async function processDripJob(job: Job<DripJobData>): Promise<void> {
   const { applicationId, emailNumber } = job.data;
+  const debugApplication = await queryOne<{
+    id: string;
+    application_id: string;
+    email: string;
+    status: string;
+  }>(
+    `SELECT
+     id::text,
+     application_id::text,
+     email,
+     status
+   FROM loan_applications
+   WHERE id::text = $1`,
+    [applicationId],
+  );
+
+  console.log("[drip] direct DB lookup:", debugApplication);
 
   const application = await getApplicationById(applicationId);
+
   if (!application) {
     console.log(
       `[drip] application ${applicationId} no longer exists — skipping email ${emailNumber}`,
@@ -63,11 +82,6 @@ async function processDripJob(job: Job<DripJobData>): Promise<void> {
     );
     return;
   }
-
-  console.log("[drip] Application IDs:", {
-    databaseId: application.id,
-    applicationId: application.application_id,
-  });
 
   await sendDripEmail(emailNumber, {
     applicationId: application.application_id,
