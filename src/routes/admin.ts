@@ -303,24 +303,25 @@ router.get(
   },
 );
 
-// GET /api/admin/applications/:id — View single application
+// GET /api/admin/applications/:application_id — View single application
 router.get(
-  "/applications/:id",
+  "/applications/:application_id",
   requireAuth(["admin", "reviewer", "viewer"]),
   async (req: AuthRequest, res: Response) => {
     try {
-      const id = req.params.id as string;
+      const application_id = req.params.application_id as string;
 
-      const application = await getApplicationByIdDecrypted(id);
+      const application = await getApplicationByIdDecrypted(application_id);
 
       if (!application) {
         res.status(404).json({ error: "Application not found" });
         return;
       }
 
+      // Use application.id (the actual database UUID) instead of application_id ("95402")
       const [auditLog, bankVerification] = await Promise.all([
-        getAuditLog(id),
-        getBankVerificationDecrypted(id),
+        getAuditLog(application.id),
+        getBankVerificationDecrypted(application.id),
       ]);
 
       const response = {
@@ -380,7 +381,7 @@ router.post(
   requireAuth(["admin"]),
   async (req: AuthRequest, res: Response) => {
     try {
-      const id = req.params.id as string;
+      const id = req.params.application_id as string;
       const application = await getApplicationByIdDecrypted(id);
       if (!application) {
         res.status(404).json({ error: "Application not found" });

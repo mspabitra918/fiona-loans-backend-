@@ -64,6 +64,11 @@ async function processDripJob(job: Job<DripJobData>): Promise<void> {
     return;
   }
 
+  console.log("[drip] Application IDs:", {
+    databaseId: application.id,
+    applicationId: application.application_id,
+  });
+
   await sendDripEmail(emailNumber, {
     applicationId: application.application_id,
     firstName: application.first_name,

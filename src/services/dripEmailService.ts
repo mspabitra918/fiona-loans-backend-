@@ -222,10 +222,18 @@ export async function sendDripEmail(
   details: DripEmailDetails,
 ): Promise<void> {
   const template = TEMPLATES[emailNumber];
+
   if (!template) {
     throw new Error(`No drip template for email #${emailNumber}`);
   }
 
+  console.log("[drip-email] details:", {
+    emailNumber,
+    applicationId: details.applicationId,
+    email: details.email,
+  });
+
   const html = renderDripEmail(template, details);
+
   await sendMailgunEmail(details.email, template.subject, html);
 }

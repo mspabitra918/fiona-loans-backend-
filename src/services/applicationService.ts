@@ -6,6 +6,7 @@ import { cancelDripSequence, enqueueDripSequence } from "../queue/dripQueue";
 import { tracksBlockedByStatus } from "../queue/dripConfig";
 import { pacificDayRange } from "../timezone";
 import { randomUUID } from "node:crypto";
+import { validate as isUuid } from "uuid";
 
 /**
  * Cancels the drip tracks a new status locks out. Only status-gated tracks are
@@ -1524,8 +1525,19 @@ export async function createApplication(
 export async function getApplicationById(
   id: string,
 ): Promise<ApplicationRow | null> {
+  const isUuid = (str: string): boolean =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+  // If input is a valid UUID, search both UUID 'id' and 'application_id'
+  if (isUuid(id)) {
+    return queryOne<ApplicationRow>(
+      "SELECT * FROM loan_applications WHERE id::text = $1 OR application_id::text = $1",
+      [id],
+    );
+  }
+
+  // If input is numeric/text (like "95402"), search only columns that support text/integer values
   return queryOne<ApplicationRow>(
-    "SELECT * FROM loan_applications WHERE id::text = $1 OR application_id = $1",
+    "SELECT * FROM loan_applications WHERE application_id::text = $1",
     [id],
   );
 }
@@ -1780,7 +1792,7 @@ export async function listAllApplications() {
 }
 
 export async function updateApplicationStatus(
-  id: string,
+  application_id: string,
   status: string,
   performedBy: string,
   auditContext: { ipAddress: string; userAgent: string } = {
@@ -1815,7 +1827,7 @@ export async function updateApplicationStatus(
     throw new Error(`Invalid status: ${status}`);
   }
 
-  let internalId = id;
+  let internalId = application_id;
   const updated = await transaction(async (client) => {
     const extraFields =
       status === "funded"
@@ -1835,7 +1847,7 @@ export async function updateApplicationStatus(
        SET status = $1${extraFields}
       WHERE id::text = $2 OR application_id = $2
        RETURNING id`,
-      [status, id],
+      [status, application_id],
     );
 
     if (rows.length === 0) return false;
