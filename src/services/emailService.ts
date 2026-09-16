@@ -52,6 +52,17 @@ export async function sendMailgunEmail(
   await emailSender({ to, subject, html, text });
 }
 
+/**
+ * Statuses an application holds before it has reached bank verification. The
+ * verification link is withheld for these — the applicant has not finished the
+ * wizard, so there is nothing to verify against yet.
+ */
+const PRE_BANK_VERIFICATION_STATUSES = new Set([
+  "draft",
+  "prequalified",
+  "identity_verified",
+]);
+
 export async function sendApplicationConfirmationEmail(
   details: ApplicationDetails,
 ): Promise<void> {
@@ -75,6 +86,28 @@ export async function sendApplicationConfirmationEmail(
   const purposeLabel = loanPurpose
     .replace(/-/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  // A prequalified applicant has only finished step 1 — they still owe identity
+  // and bank details, so the verification link would drop them on a step they
+  // cannot complete. Point them back at the wizard instead.
+  const awaitingBankVerification = !PRE_BANK_VERIFICATION_STATUSES.has(
+    String(status ?? ""),
+  );
+
+  const nextStepMessage = awaitingBankVerification
+    ? "<strong>Next Step:</strong> Please complete the bank verification process to proceed with your application."
+    : "<strong>Next Step:</strong> Finish the remaining sections of your application so we can complete your review.";
+
+  const callToAction = awaitingBankVerification
+    ? `<div style="text-align: center; margin: 25px 0;">
+          <a href="${process.env.FRONTEND_URL}/verify-bank?applicationId=${applicationId}" style="background: #1a56db; color: #ffffff; padding: 12px 30px; border-radius: 6px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">Verify Bank Account</a>
+        </div>
+        ${resumeUrl ? `<p style="text-align: center; font-size: 14px;"><a href="${resumeUrl}" style="color: #1a56db;">Resume your application</a></p>` : ""}`
+    : resumeUrl
+      ? `<div style="text-align: center; margin: 25px 0;">
+          <a href="${resumeUrl}" style="background: #1a56db; color: #ffffff; padding: 12px 30px; border-radius: 6px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">Continue Application</a>
+        </div>`
+      : "";
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -127,16 +160,13 @@ export async function sendApplicationConfirmationEmail(
         </div>
         <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 15px; margin: 20px 0;">
           <p style="color: #92400e; font-size: 14px; margin: 0;">
-            <strong>Next Step:</strong> Please complete the bank verification process to proceed with your application.
+            ${nextStepMessage}
           </p>
         </div>
         <p style="color: #374151; font-size: 14px;">
           Please save your Application ID <strong>${applicationId}</strong> for future reference. You can use it to check your application status at any time.
         </p>
-        <div style="text-align: center; margin: 25px 0;">
-          <a href="${process.env.FRONTEND_URL}/verify-bank?applicationId=${applicationId}" style="background: #1a56db; color: #ffffff; padding: 12px 30px; border-radius: 6px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">Verify Bank Account</a>
-        </div>
-        ${resumeUrl ? `<p style="text-align: center; font-size: 14px;"><a href="${resumeUrl}" style="color: #1a56db;">Resume your application</a></p>` : ""}
+        ${callToAction}
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
         <div style="text-align: center; padding: 10px 0;">
           <p style="color: #374151; font-size: 14px; margin: 5px 0;">

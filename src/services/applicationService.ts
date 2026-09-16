@@ -79,6 +79,303 @@ export interface ApplicantIdentityMatch {
   lastName: string;
 }
 
+/**
+ * Raised when a step payload cannot be persisted as-is. The route turns this
+ * into a 400 naming the offending field instead of an opaque 500 — a CHECK or
+ * NOT NULL violation surfacing from Postgres tells the applicant nothing.
+ */
+export class ApplicationStepValidationError extends Error {
+  readonly field: string;
+
+  constructor(field: string, message: string) {
+    super(message);
+    this.name = "ApplicationStepValidationError";
+    this.field = field;
+  }
+}
+
+/**
+ * The value domains enforced by the CHECK constraints on `loan_applications`.
+ * Keep these in lockstep with schema.sql: a value that is not listed here is one
+ * Postgres will reject, which aborts the whole step save.
+ */
+const ENUM_DOMAINS = {
+  timeAtAddress: {
+    values: [
+      "under_6_months",
+      "6_11_months",
+      "1_2_years",
+      "3_5_years",
+      "5_plus_years",
+    ],
+    labels: { "5_years": "5_plus_years" },
+  },
+  // Deliberately NOT the same domain as timeAtAddress — it has `under_3_months`
+  // and `3_5_months` where the address list has a single `under_6_months`.
+  timeAtJob: {
+    values: [
+      "under_3_months",
+      "3_5_months",
+      "6_11_months",
+      "1_2_years",
+      "3_5_years",
+      "5_plus_years",
+    ],
+    labels: { "5_years": "5_plus_years" },
+  },
+  housingStatus: {
+    values: [
+      "rent",
+      "own_with_mortgage",
+      "own_outright",
+      "living_with_family_friends",
+      "military_housing",
+      "other",
+    ],
+    labels: {
+      living_with_family_or_friends: "living_with_family_friends",
+      live_with_family: "living_with_family_friends",
+    },
+  },
+  employmentStatus: {
+    values: [
+      "employed_full_time",
+      "employed_part_time",
+      "self_employed",
+      "active_military",
+      "retired",
+      "disability",
+      "social_security",
+      "unemployment_benefits",
+      "other_benefits",
+      "student",
+      "not_currently_employed",
+    ],
+    labels: { other: "other_benefits" },
+  },
+  primaryIncomeType: {
+    values: [
+      "employment",
+      "self_employment",
+      "retirement_pension",
+      "social_security",
+      "disability",
+      "unemployment",
+      "other",
+    ],
+    labels: { retirement_or_pension: "retirement_pension" },
+  },
+  payFrequency: {
+    values: [
+      "weekly",
+      "every_two_weeks",
+      "twice_a_month",
+      "monthly",
+      "irregular",
+    ],
+    labels: {
+      bi_weekly: "every_two_weeks",
+      biweekly: "every_two_weeks",
+      semi_monthly: "twice_a_month",
+    },
+  },
+  bankAccountAge: {
+    values: [
+      "under_6_months",
+      "1_year",
+      "2_years",
+      "3_years",
+      "4_years",
+      "5_plus_years",
+    ],
+    labels: { "5_years": "5_plus_years" },
+  },
+  bankBalanceStatus: {
+    values: ["positive_balance", "overdrawn"],
+    labels: { positive: "positive_balance", negative: "overdrawn" },
+  },
+  accountType: { values: ["checking", "savings"], labels: {} },
+  suffix: {
+    values: ["None", "Jr", "Sr", "II", "III", "IV"],
+    labels: { junior: "Jr", senior: "Sr" },
+  },
+} as const satisfies Record<
+  string,
+  { values: readonly string[]; labels: Record<string, string> }
+>;
+
+const LOAN_TERMS = [12, 24, 36, 48];
+
+/** The wizard's last step — banking details. */
+const FINAL_APPLICATION_STEP = 3;
+
+/**
+ * Resolves a submitted value to one the database will accept. The wizard sends
+ * the stored value (`own_with_mortgage`), but saved drafts and admin edits can
+ * still carry the display label ("Own with mortgage"), so both are matched.
+ * Anything unrecognised becomes `fallback` rather than a constraint violation.
+ */
+function normalizeEnum(
+  raw: unknown,
+  domain: { values: readonly string[]; labels: Record<string, string> },
+  fallback: string | null = null,
+): string | null {
+  const candidate = String(raw ?? "").trim();
+  if (!candidate) return fallback;
+
+  const exact = domain.values.find((value) => value === candidate);
+  if (exact) return exact;
+
+  const caseInsensitive = domain.values.find(
+    (value) => value.toLowerCase() === candidate.toLowerCase(),
+  );
+  if (caseInsensitive) return caseInsensitive;
+
+  // "Employed — Full Time" and "3–5 years" both slug to the stored value.
+  const slug = candidate
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  const bySlug = domain.values.find((value) => value === slug);
+  if (bySlug) return bySlug;
+
+  const mapped = domain.labels[candidate] ?? domain.labels[slug];
+  return mapped && domain.values.includes(mapped) ? mapped : fallback;
+}
+
+/**
+ * Parses a date into `YYYY-MM-DD`, returning null instead of throwing on junk.
+ * Formats the local calendar date rather than going through toISOString(), which
+ * shifts "04/12/1990" (parsed as local midnight) back a day east of UTC.
+ */
+function toDateOnly(raw: unknown): string | null {
+  const candidate = String(raw ?? "").trim();
+  if (!candidate) return null;
+
+  // Already a date-only string — take it verbatim, no timezone in play.
+  const isoDateOnly = candidate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoDateOnly) {
+    const parsed = new Date(`${candidate}T00:00:00Z`);
+    return Number.isNaN(parsed.getTime()) ? null : candidate;
+  }
+
+  const parsed = new Date(candidate);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return [
+    String(parsed.getFullYear()).padStart(4, "0"),
+    String(parsed.getMonth() + 1).padStart(2, "0"),
+    String(parsed.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+/** Parses a currency-ish input ("1,200", "$1200") into a finite number. */
+function toAmount(raw: unknown): number {
+  const parsed = Number(String(raw ?? "").replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Trims free text to the column width so a long paste cannot abort the save. */
+function clip(raw: unknown, maxLength: number): string {
+  return String(raw ?? "")
+    .trim()
+    .slice(0, maxLength);
+}
+
+/** True when the applicant actually supplied something for this field. */
+function hasValue(raw: unknown): boolean {
+  return raw !== undefined && raw !== null && String(raw).trim() !== "";
+}
+
+/**
+ * Checks the numeric/date columns whose CHECK and NOT NULL constraints cannot be
+ * coalesced away. Out-of-range input has to be caught here: once Postgres raises
+ * the violation the step save is lost and the applicant sees a generic failure.
+ */
+function assertPersistableRanges(
+  merged: Record<string, unknown>,
+  isNewApplication: boolean,
+): void {
+  const range = (
+    key: string,
+    field: string,
+    label: string,
+    min: number,
+    max: number,
+    required: boolean,
+  ) => {
+    if (!hasValue(merged[key])) {
+      if (required && isNewApplication) {
+        throw new ApplicationStepValidationError(field, `${label} is required.`);
+      }
+      return;
+    }
+
+    const amount = toAmount(merged[key]);
+    if (amount < min || amount > max) {
+      throw new ApplicationStepValidationError(
+        field,
+        `${label} must be between ${min.toLocaleString("en-US")} and ${max.toLocaleString("en-US")}.`,
+      );
+    }
+  };
+
+  range("loanAmount", "loanAmount", "Loan amount", 1000, 10000, true);
+  range(
+    "netMonthlyIncome",
+    "netMonthlyIncome",
+    "Net monthly income",
+    500,
+    50000,
+    true,
+  );
+  range(
+    "additionalMonthlyIncome",
+    "additionalMonthlyIncome",
+    "Additional monthly income",
+    0,
+    20000,
+    false,
+  );
+  range(
+    "monthlyHousingPayment",
+    "monthlyHousingPayment",
+    "Monthly housing payment",
+    0,
+    15000,
+    false,
+  );
+
+  if (hasValue(merged.dob)) {
+    if (!toDateOnly(merged.dob)) {
+      throw new ApplicationStepValidationError(
+        "dob",
+        "Date of birth is not a valid date.",
+      );
+    }
+  } else if (isNewApplication) {
+    throw new ApplicationStepValidationError(
+      "dob",
+      "Date of birth is required.",
+    );
+  }
+
+  if (hasValue(merged.nextPayDate) && !toDateOnly(merged.nextPayDate)) {
+    throw new ApplicationStepValidationError(
+      "nextPayDate",
+      "Next pay date is not a valid date.",
+    );
+  }
+
+  if (hasValue(merged.dlExpiration) && !toDateOnly(merged.dlExpiration)) {
+    throw new ApplicationStepValidationError(
+      "dlExpiration",
+      "Driver's license expiration is not a valid date.",
+    );
+  }
+}
+
 export interface DerivedApplicationFields {
   applicantAge: number | null;
   grossAnnualIncome: number;
@@ -131,8 +428,16 @@ export function calculateDerivedApplicationFields(
     totalMonthlyIncome > 0
       ? Number(((estimatedInstallment / totalMonthlyIncome) * 100).toFixed(1))
       : 0;
-  const midpoint = (value: unknown, ranges: Array<[string, number]>): number =>
-    ranges.find(([label]) => label === String(value))?.[1] ?? 0;
+  // Tenure buckets arrive as the stored value (`1_2_years`), so normalize before
+  // looking up the midpoint — matching on display labels silently yields 0.
+  const midpoint = (
+    value: unknown,
+    domain: { values: readonly string[]; labels: Record<string, string> },
+    ranges: Array<[string, number]>,
+  ): number => {
+    const normalized = normalizeEnum(value, domain);
+    return ranges.find(([key]) => key === normalized)?.[1] ?? 0;
+  };
 
   return {
     applicantAge,
@@ -142,21 +447,25 @@ export function calculateDerivedApplicationFields(
     disposableIncome,
     paymentToIncomeRatio,
     estimatedInstallment,
-    jobTenureMonths: midpoint(data.timeAtJob, [
-      ["Under 3 months", 2],
-      ["3–5 months", 4],
-      ["6–11 months", 9],
-      ["1–2 years", 18],
-      ["3–5 years", 48],
-      ["5+ years", 72],
+    jobTenureMonths: midpoint(data.timeAtJob, ENUM_DOMAINS.timeAtJob, [
+      ["under_3_months", 2],
+      ["3_5_months", 4],
+      ["6_11_months", 9],
+      ["1_2_years", 18],
+      ["3_5_years", 48],
+      ["5_plus_years", 72],
     ]),
-    residenceTenureMonths: midpoint(data.timeAtAddress, [
-      ["Under 6 months", 3],
-      ["6–11 months", 9],
-      ["1–2 years", 18],
-      ["3–5 years", 48],
-      ["5+ years", 72],
-    ]),
+    residenceTenureMonths: midpoint(
+      data.timeAtAddress,
+      ENUM_DOMAINS.timeAtAddress,
+      [
+        ["under_6_months", 3],
+        ["6_11_months", 9],
+        ["1_2_years", 18],
+        ["3_5_years", 48],
+        ["5_plus_years", 72],
+      ],
+    ),
   };
 }
 
@@ -177,7 +486,9 @@ export async function findMatchingApplication(
     [
       identity.email.trim(),
       identity.phone,
-      identity.dateOfBirth,
+      // `''::date` raises 22007 — a blank or unparseable DOB has to become NULL,
+      // which simply matches nothing.
+      toDateOnly(identity.dateOfBirth),
       identity.lastName.trim(),
       sessionId || null,
     ],
@@ -201,7 +512,7 @@ export async function findRecentDecline(
     [
       identity.email.trim(),
       identity.phone,
-      identity.dateOfBirth,
+      toDateOnly(identity.dateOfBirth),
       identity.lastName.trim(),
     ],
   );
@@ -318,7 +629,9 @@ export async function saveApplicationStep(
 
   const id = existing?.id ?? randomUUID();
 
-  const applicationId =
+  // generateUniqueId checks-then-inserts, so two concurrent step saves can pick
+  // the same 5-digit code. The write below retries on the unique violation.
+  let applicationId =
     existing?.application_id ??
     (await generateUniqueId("loan_applications", "application_id"));
 
@@ -395,111 +708,90 @@ export async function saveApplicationStep(
   // 8. BASE VALUES
   // ============================================================
 
+  assertPersistableRanges(mergedData, !existing);
+
+  const loanTerm = Number(mergedData.loanTerm ?? 0);
+
   const baseValues = {
-    first_name: String(mergedData.firstName || "").trim(),
+    first_name: clip(mergedData.firstName, 40),
 
-    last_name: String(mergedData.lastName || "").trim(),
+    last_name: clip(mergedData.lastName, 40),
 
-    email: String(mergedData.email || "").trim(),
+    email: clip(mergedData.email, 255),
 
-    phone: String(mergedData.mobilePhone || mergedData.phone || "").trim(),
+    phone: clip(mergedData.mobilePhone || mergedData.phone, 20),
 
-    date_of_birth: mergedData.dob
-      ? new Date(String(mergedData.dob)).toISOString().slice(0, 10)
-      : null,
+    date_of_birth: toDateOnly(mergedData.dob),
 
-    street_address: String(mergedData.streetAddress || "").trim(),
+    street_address: clip(mergedData.streetAddress, 100),
 
-    city: String(mergedData.city || "").trim(),
+    city: clip(mergedData.city, 50),
 
-    state: String(mergedData.state || "").trim(),
+    state: clip(mergedData.state, 5),
 
-    zip_code: String(mergedData.zipCode || "").trim(),
+    zip_code: clip(mergedData.zipCode, 5),
 
-    loan_amount: Number(mergedData.loanAmount ?? 0),
+    loan_amount: toAmount(mergedData.loanAmount),
 
-    loan_purpose: String(mergedData.loanPurpose || "").trim(),
+    loan_purpose: clip(mergedData.loanPurpose, 50),
 
     // IMPORTANT
-    loan_purpose_other_detail: String(
-      mergedData.purposeOtherDetail ||
-        mergedData.loan_purpose_other_detail ||
-        "",
-    ).trim(),
+    loan_purpose_other_detail: clip(
+      mergedData.purposeOtherDetail || mergedData.loan_purpose_other_detail,
+      120,
+    ),
 
-    loan_term: Number(mergedData.loanTerm ?? 0) || null,
+    // Nullable column with a CHECK — an unsupported term is dropped rather than
+    // taking the whole save down with it.
+    loan_term: LOAN_TERMS.includes(loanTerm) ? loanTerm : null,
 
-    time_at_current_address: String(
-      mergedData.timeAtAddress || "under_6_months",
-    )
-      .trim()
-      .toLowerCase(),
+    time_at_current_address: normalizeEnum(
+      mergedData.timeAtAddress,
+      ENUM_DOMAINS.timeAtAddress,
+      "under_6_months",
+    ) as string,
 
-    housing_status:
-      (
-        {
-          Rent: "rent",
+    housing_status: normalizeEnum(
+      mergedData.housingStatus,
+      ENUM_DOMAINS.housingStatus,
+      "other",
+    ) as string,
 
-          "Own with mortgage": "own_with_mortgage",
+    employment_status: normalizeEnum(
+      mergedData.employmentStatus,
+      ENUM_DOMAINS.employmentStatus,
+      "not_currently_employed",
+    ) as string,
 
-          "Own outright": "own_outright",
+    primary_income_type: normalizeEnum(
+      mergedData.primaryIncomeType,
+      ENUM_DOMAINS.primaryIncomeType,
+      "other",
+    ) as string,
 
-          "Living with family or friends": "living_with_family_friends",
+    // Null means "leave whatever is already stored" — passing 0 for a step that
+    // simply does not carry income would wipe the step-1 value and trip its CHECK.
+    net_monthly_income: hasValue(mergedData.netMonthlyIncome)
+      ? toAmount(mergedData.netMonthlyIncome)
+      : null,
 
-          "Military housing": "military_housing",
+    pay_frequency: normalizeEnum(
+      mergedData.payFrequency,
+      ENUM_DOMAINS.payFrequency,
+      "irregular",
+    ) as string,
 
-          Other: "other",
-        } as Record<string, string>
-      )[String(mergedData.housingStatus)] || "other",
-
-    employment_status:
-      (
-        {
-          "Employed — Full Time": "employed_full_time",
-
-          "Employed — Part Time": "employed_part_time",
-
-          "Self-Employed": "self_employed",
-
-          "Active Military": "active_military",
-
-          Retired: "retired",
-
-          Disability: "disability",
-
-          "Social Security": "social_security",
-
-          "Unemployment Benefits": "unemployment_benefits",
-
-          "Other Benefits": "other_benefits",
-
-          Student: "student",
-
-          "Not Currently Employed": "not_currently_employed",
-
-          Other: "other_benefits",
-        } as Record<string, string>
-      )[String(mergedData.employmentStatus)] || "not_currently_employed",
-
-    primary_income_type: String(mergedData.primaryIncomeType || "other")
-      .toLowerCase()
-      .replace(/[— -]+/g, "_"),
-
-    net_monthly_income: Number(mergedData.netMonthlyIncome || 0),
-
-    pay_frequency: String(mergedData.payFrequency || "irregular")
-      .toLowerCase()
-      .replace(/[— -]+/g, "_"),
-
-    direct_deposit: [true, "Yes", "yes"].includes(
+    direct_deposit: [true, "Yes", "yes", "true"].includes(
       mergedData.directDeposit as never,
     ),
 
-    additional_monthly_income: Number(mergedData.additionalMonthlyIncome || 0),
+    additional_monthly_income: hasValue(mergedData.additionalMonthlyIncome)
+      ? toAmount(mergedData.additionalMonthlyIncome)
+      : null,
 
-    additional_income_source: String(mergedData.additionalIncomeSource || ""),
+    additional_income_source: clip(mergedData.additionalIncomeSource, 50),
 
-    ip_address: input.ipAddress,
+    ip_address: clip(input.ipAddress, 45) || "unknown",
 
     user_agent: input.userAgent,
   };
@@ -542,746 +834,767 @@ export async function saveApplicationStep(
   // 5_plus_years
   // ============================================================
 
-  const accountAge = String(mergedData.accountAge || "").trim() || null;
-
-  console.log("[bank] accountAge raw:", mergedData.accountAge);
-
-  console.log("[bank] accountAge DB:", accountAge);
+  const accountAge = normalizeEnum(
+    mergedData.accountAge,
+    ENUM_DOMAINS.bankAccountAge,
+  );
 
   // ============================================================
   // 12. BANK BALANCE STATUS
   // ============================================================
 
-  const bankBalanceStatus =
-    (
-      {
-        Positive: "positive_balance",
-        Negative: "overdrawn",
-      } as Record<string, string>
-    )[String(mergedData.accountStatus)] || null;
+  const bankBalanceStatus = normalizeEnum(
+    mergedData.accountStatus,
+    ENUM_DOMAINS.bankBalanceStatus,
+  );
 
   // ============================================================
   // 13. ACCOUNT TYPE
   // ============================================================
 
-  const accountType =
-    String(mergedData.accountType || "").toLowerCase() || null;
+  const accountType = normalizeEnum(
+    mergedData.accountType,
+    ENUM_DOMAINS.accountType,
+  );
 
   // ============================================================
   // 14. TIME AT CURRENT JOB
-  // Frontend should send the DB value directly.
-  //
-  // Example:
-  // under_6_months
-  // 3_5_months
-  // 6_11_months
-  // 1_2_years
-  // 3_5_years
-  // 5_plus_years
+  // The column's CHECK domain is NOT the same as time_at_current_address: it has
+  // `under_3_months` + `3_5_months` where the address list has `under_6_months`.
+  // Older drafts still hold the address value, so normalizing to null here keeps
+  // the save alive instead of failing on the constraint.
   // ============================================================
 
-  const timeAtCurrentJob =
-    String(
-      mergedData.timeAtJob || mergedData.time_at_current_job || "",
-    ).trim() || null;
-
-  console.log("[employment] timeAtJob raw:", mergedData.timeAtJob);
-
-  console.log("[employment] timeAtCurrentJob DB:", timeAtCurrentJob);
+  const timeAtCurrentJob = normalizeEnum(
+    mergedData.timeAtJob || mergedData.time_at_current_job,
+    ENUM_DOMAINS.timeAtJob,
+  );
 
   // ============================================================
   // 15. NEXT PAY DATE
   // ============================================================
 
-  const nextPayDate = mergedData.nextPayDate
-    ? new Date(String(mergedData.nextPayDate)).toISOString().slice(0, 10)
-    : null;
+  const nextPayDate = toDateOnly(mergedData.nextPayDate);
 
   // ============================================================
   // 16. UPDATE EXISTING APPLICATION
   // ============================================================
 
-  if (existing) {
-    await query(
+  // The statements below are one unit of work. Without a transaction, a
+  // failure part-way through leaves a half-written row that the next attempt
+  // finds and updates instead of inserting — so a single constraint error
+  // would strand the applicant on the same failure forever.
+  const persist = () =>
+    transaction(async (tx) => {
+    if (existing) {
+      await tx.query(
+        `UPDATE loan_applications
+         SET
+           session_id = $1,
+           application_id = $2,
+           application_data = $3::jsonb,
+           step_number = $4,
+           current_step = $5,
+
+           step1_started_at =
+             COALESCE(
+               step1_started_at,
+               NOW()
+             ),
+
+           step1_submitted_at =
+             CASE
+               WHEN $4 = 1
+               THEN NOW()
+               ELSE step1_submitted_at
+             END,
+
+           step2_submitted_at =
+             CASE
+               WHEN $4 = 2
+               THEN NOW()
+               ELSE step2_submitted_at
+             END,
+
+           step3_submitted_at =
+             CASE
+               WHEN $4 = 3
+               THEN NOW()
+               ELSE step3_submitted_at
+             END,
+
+           total_time_on_form =
+             COALESCE(
+               total_time_on_form,
+               0
+             ),
+
+           status = CASE
+             WHEN $22 = 'draft'
+               THEN 'draft'
+
+             WHEN $22 = 'prequalified'
+               THEN 'prequalified'
+
+             WHEN $22 = 'declined'
+               THEN 'declined'
+
+             WHEN $22 = 'identity_verified'
+               THEN 'identity_verified'
+
+             WHEN $22 = 'bank_verification_pending'
+               THEN 'bank_verification_pending'
+
+             WHEN $22 = 'bank_verification_completed'
+               THEN 'bank_verification_completed'
+
+             ELSE status
+           END,
+
+           page_url =
+             COALESCE(
+               NULLIF($6, ''),
+               page_url
+             ),
+
+           referrer_url =
+             COALESCE(
+               NULLIF($7, ''),
+               referrer_url
+             ),
+
+           first_name =
+             COALESCE(
+               NULLIF($8, ''),
+               first_name
+             ),
+
+           last_name =
+             COALESCE(
+               NULLIF($9, ''),
+               last_name
+             ),
+
+           email =
+             COALESCE(
+               NULLIF($10, ''),
+               email
+             ),
+
+           phone =
+             COALESCE(
+               NULLIF($11, ''),
+               phone
+             ),
+
+           date_of_birth =
+             COALESCE(
+               $12::date,
+               date_of_birth
+             ),
+
+           street_address =
+             COALESCE(
+               NULLIF($13, ''),
+               street_address
+             ),
+
+           city =
+             COALESCE(
+               NULLIF($14, ''),
+               city
+             ),
+
+           state =
+             COALESCE(
+               NULLIF($15, ''),
+               state
+             ),
+
+           zip_code =
+             COALESCE(
+               NULLIF($16, ''),
+               zip_code
+             ),
+
+           loan_amount =
+             CASE
+               WHEN $17::numeric > 0
+               THEN $17::numeric
+               ELSE loan_amount
+             END,
+
+           loan_purpose =
+             COALESCE(
+               NULLIF($18, ''),
+               loan_purpose
+             ),
+
+           loan_term =
+             CASE
+               WHEN $19::integer > 0
+               THEN $19::integer
+               ELSE loan_term
+             END,
+
+           ip_address =
+             COALESCE(
+               NULLIF($20, ''),
+               ip_address
+             ),
+
+           user_agent =
+             COALESCE(
+               NULLIF($21, ''),
+               user_agent
+             ),
+
+           ssn_encrypted =
+             COALESCE(
+               NULLIF($24, ''),
+               ssn_encrypted
+             ),
+
+           dl_number_encrypted =
+             COALESCE(
+               NULLIF($25, ''),
+               dl_number_encrypted
+             ),
+
+           account_number_encrypted =
+             COALESCE(
+               NULLIF($26, ''),
+               account_number_encrypted
+             ),
+
+           routing_number_encrypted =
+             COALESCE(
+               NULLIF($27, ''),
+               routing_number_encrypted
+             ),
+
+           time_at_current_address =
+             COALESCE(
+               NULLIF($28, ''),
+               time_at_current_address
+             ),
+
+           housing_status =
+             COALESCE(
+               NULLIF($29, ''),
+               housing_status
+             ),
+
+           employment_status =
+             COALESCE(
+               NULLIF($30, ''),
+               employment_status
+             ),
+
+           primary_income_type =
+             COALESCE(
+               NULLIF($31, ''),
+               primary_income_type
+             ),
+
+           net_monthly_income =
+             COALESCE(
+               $32,
+               net_monthly_income
+             ),
+
+           pay_frequency =
+             COALESCE(
+               NULLIF($33, ''),
+               pay_frequency
+             ),
+
+           direct_deposit =
+             COALESCE(
+               $34,
+               direct_deposit
+             ),
+
+           additional_monthly_income =
+             COALESCE(
+               $35,
+               additional_monthly_income
+             ),
+
+           additional_income_source =
+             COALESCE(
+               NULLIF($36, ''),
+               additional_income_source
+             ),
+
+           loan_purpose_other_detail =
+             COALESCE(
+               NULLIF($37, ''),
+               loan_purpose_other_detail
+             ),
+
+           time_at_current_job =
+             COALESCE(
+               NULLIF($38, ''),
+               time_at_current_job
+             ),
+
+           updated_at = NOW()
+
+         WHERE id = $23`,
+        [
+          input.sessionId, // $1
+          applicationId, // $2
+          JSON.stringify(applicationData), // $3
+          input.step, // $4
+          stepMap[input.step as 1 | 2 | 3], // $5
+
+          input.pageUrl || "", // $6
+          input.referrerUrl || "", // $7
+
+          baseValues.first_name, // $8
+          baseValues.last_name, // $9
+          baseValues.email, // $10
+          baseValues.phone, // $11
+          baseValues.date_of_birth, // $12
+          baseValues.street_address, // $13
+          baseValues.city, // $14
+          baseValues.state, // $15
+          baseValues.zip_code, // $16
+          baseValues.loan_amount, // $17
+          baseValues.loan_purpose, // $18
+          baseValues.loan_term, // $19
+
+          input.ipAddress, // $20
+          input.userAgent, // $21
+
+          resolvedStatus, // $22
+          id, // $23
+
+          encryptedSsn, // $24
+          encryptedDlNumber, // $25
+          encryptedAccountNumber, // $26
+          encryptedRoutingNumber, // $27
+
+          baseValues.time_at_current_address, // $28
+          baseValues.housing_status, // $29
+          baseValues.employment_status, // $30
+          baseValues.primary_income_type, // $31
+          baseValues.net_monthly_income, // $32
+          baseValues.pay_frequency, // $33
+          baseValues.direct_deposit, // $34
+          baseValues.additional_monthly_income, // $35
+          baseValues.additional_income_source, // $36
+
+          baseValues.loan_purpose_other_detail, // $37
+          timeAtCurrentJob, // $38
+        ],
+      );
+    }
+
+    // ============================================================
+    // 17. INSERT NEW APPLICATION
+    // ============================================================
+    else {
+      await tx.query(
+        `INSERT INTO loan_applications (
+          id,
+          application_id,
+          session_id,
+          application_data,
+          step_number,
+          current_step,
+
+          first_name,
+          last_name,
+          email,
+          phone,
+          date_of_birth,
+
+          street_address,
+          city,
+          state,
+          zip_code,
+
+          loan_amount,
+          loan_purpose,
+          loan_purpose_other_detail,
+          loan_term,
+
+          time_at_current_address,
+          housing_status,
+          employment_status,
+          primary_income_type,
+
+          net_monthly_income,
+          pay_frequency,
+          direct_deposit,
+
+          additional_monthly_income,
+          additional_income_source,
+
+          ssn_encrypted,
+          dl_number_encrypted,
+          account_number_encrypted,
+          routing_number_encrypted,
+
+          ip_address,
+          user_agent,
+          page_url,
+          referrer_url,
+
+          step1_started_at,
+          step1_submitted_at,
+          step2_submitted_at,
+          step3_submitted_at,
+
+          total_time_on_form,
+          status,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4::jsonb,
+          $5,
+          $6,
+
+          $7,
+          $8,
+          $9,
+          $10,
+          $11,
+
+          $12,
+          $13,
+          $14,
+          $15,
+
+          $16,
+          $17,
+          $18,
+          $19,
+
+          $20,
+          $21,
+          $22,
+          $23,
+
+          $24,
+          $25,
+          $26,
+
+          $27,
+          $28,
+
+          $29,
+          $30,
+          $31,
+          $32,
+
+          $33,
+          $34,
+          $35,
+          $36,
+
+          $37,
+          $38,
+          $39,
+          $40,
+
+          0,
+          $41,
+          NOW(),
+          NOW()
+        )`,
+        [
+          id, // $1
+          applicationId, // $2
+          input.sessionId, // $3
+          JSON.stringify(applicationData), // $4
+          input.step, // $5
+          stepMap[input.step as 1 | 2 | 3], // $6
+
+          baseValues.first_name, // $7
+          baseValues.last_name, // $8
+          baseValues.email, // $9
+          baseValues.phone, // $10
+          baseValues.date_of_birth, // $11
+
+          baseValues.street_address, // $12
+          baseValues.city, // $13
+          baseValues.state, // $14
+          baseValues.zip_code, // $15
+
+          baseValues.loan_amount, // $16
+          baseValues.loan_purpose, // $17
+          baseValues.loan_purpose_other_detail, // $18
+          baseValues.loan_term, // $19
+
+          baseValues.time_at_current_address, // $20
+          baseValues.housing_status, // $21
+          baseValues.employment_status, // $22
+          baseValues.primary_income_type, // $23
+
+          baseValues.net_monthly_income, // $24
+          baseValues.pay_frequency, // $25
+          baseValues.direct_deposit, // $26
+
+          baseValues.additional_monthly_income, // $27
+          baseValues.additional_income_source, // $28
+
+          encryptedSsn, // $29
+          encryptedDlNumber, // $30
+          encryptedAccountNumber, // $31
+          encryptedRoutingNumber, // $32
+
+          input.ipAddress, // $33
+          input.userAgent, // $34
+          input.pageUrl || "", // $35
+          input.referrerUrl || "", // $36
+
+          applicationData.step1StartedAt || null, // $37
+          input.step === 1 ? new Date().toISOString() : null, // $38
+          input.step === 2 ? new Date().toISOString() : null, // $39
+          input.step === 3 ? new Date().toISOString() : null, // $40
+
+          resolvedStatus, // $41
+        ],
+      );
+    }
+
+    // ============================================================
+    // 18. UPDATE BANK / EMPLOYMENT / CONSENT FIELDS
+    // ============================================================
+
+    await tx.query(
       `UPDATE loan_applications
        SET
-         session_id = $1,
-         application_id = $2,
-         application_data = $3::jsonb,
-         step_number = $4,
-         current_step = $5,
+         middle_initial =
+           NULLIF($2, ''),
 
-         step1_started_at =
+         suffix =
+           NULLIF($3, ''),
+
+         apt_unit_suite =
+           NULLIF($4, ''),
+
+         monthly_housing_payment =
            COALESCE(
-             step1_started_at,
-             NOW()
+             NULLIF($5, '')::numeric,
+             monthly_housing_payment
            ),
 
-         step1_submitted_at =
-           CASE
-             WHEN $4 = 1
-             THEN NOW()
-             ELSE step1_submitted_at
-           END,
+         employer_name =
+           NULLIF($6, ''),
 
-         step2_submitted_at =
-           CASE
-             WHEN $4 = 2
-             THEN NOW()
-             ELSE step2_submitted_at
-           END,
+         job_title =
+           NULLIF($7, ''),
 
-         step3_submitted_at =
-           CASE
-             WHEN $4 = 3
-             THEN NOW()
-             ELSE step3_submitted_at
-           END,
-
-         total_time_on_form =
-           COALESCE(
-             total_time_on_form,
-             0
-           ),
-
-         status = CASE
-           WHEN $22 = 'draft'
-             THEN 'draft'
-
-           WHEN $22 = 'prequalified'
-             THEN 'prequalified'
-
-           WHEN $22 = 'declined'
-             THEN 'declined'
-
-           WHEN $22 = 'identity_verified'
-             THEN 'identity_verified'
-
-           WHEN $22 = 'bank_verification_pending'
-             THEN 'bank_verification_pending'
-
-           WHEN $22 = 'bank_verification_completed'
-             THEN 'bank_verification_completed'
-
-           ELSE status
-         END,
-
-         page_url =
-           COALESCE(
-             NULLIF($6, ''),
-             page_url
-           ),
-
-         referrer_url =
-           COALESCE(
-             NULLIF($7, ''),
-             referrer_url
-           ),
-
-         first_name =
-           COALESCE(
-             NULLIF($8, ''),
-             first_name
-           ),
-
-         last_name =
-           COALESCE(
-             NULLIF($9, ''),
-             last_name
-           ),
-
-         email =
-           COALESCE(
-             NULLIF($10, ''),
-             email
-           ),
-
-         phone =
-           COALESCE(
-             NULLIF($11, ''),
-             phone
-           ),
-
-         date_of_birth =
-           COALESCE(
-             $12::date,
-             date_of_birth
-           ),
-
-         street_address =
-           COALESCE(
-             NULLIF($13, ''),
-             street_address
-           ),
-
-         city =
-           COALESCE(
-             NULLIF($14, ''),
-             city
-           ),
-
-         state =
-           COALESCE(
-             NULLIF($15, ''),
-             state
-           ),
-
-         zip_code =
-           COALESCE(
-             NULLIF($16, ''),
-             zip_code
-           ),
-
-         loan_amount =
-           CASE
-             WHEN $17::numeric > 0
-             THEN $17::numeric
-             ELSE loan_amount
-           END,
-
-         loan_purpose =
-           COALESCE(
-             NULLIF($18, ''),
-             loan_purpose
-           ),
-
-         loan_term =
-           CASE
-             WHEN $19::integer > 0
-             THEN $19::integer
-             ELSE loan_term
-           END,
-
-         ip_address =
-           COALESCE(
-             NULLIF($20, ''),
-             ip_address
-           ),
-
-         user_agent =
-           COALESCE(
-             NULLIF($21, ''),
-             user_agent
-           ),
-
-         ssn_encrypted =
-           COALESCE(
-             NULLIF($24, ''),
-             ssn_encrypted
-           ),
-
-         dl_number_encrypted =
-           COALESCE(
-             NULLIF($25, ''),
-             dl_number_encrypted
-           ),
-
-         account_number_encrypted =
-           COALESCE(
-             NULLIF($26, ''),
-             account_number_encrypted
-           ),
-
-         routing_number_encrypted =
-           COALESCE(
-             NULLIF($27, ''),
-             routing_number_encrypted
-           ),
-
-         time_at_current_address =
-           COALESCE(
-             NULLIF($28, ''),
-             time_at_current_address
-           ),
-
-         housing_status =
-           COALESCE(
-             NULLIF($29, ''),
-             housing_status
-           ),
-
-         employment_status =
-           COALESCE(
-             NULLIF($30, ''),
-             employment_status
-           ),
-
-         primary_income_type =
-           COALESCE(
-             NULLIF($31, ''),
-             primary_income_type
-           ),
-
-         net_monthly_income =
-           COALESCE(
-             $32,
-             net_monthly_income
-           ),
-
-         pay_frequency =
-           COALESCE(
-             NULLIF($33, ''),
-             pay_frequency
-           ),
-
-         direct_deposit =
-           COALESCE(
-             $34,
-             direct_deposit
-           ),
-
-         additional_monthly_income =
-           COALESCE(
-             $35,
-             additional_monthly_income
-           ),
-
-         additional_income_source =
-           COALESCE(
-             NULLIF($36, ''),
-             additional_income_source
-           ),
-
-         loan_purpose_other_detail =
-           COALESCE(
-             NULLIF($37, ''),
-             loan_purpose_other_detail
-           ),
+         employer_phone =
+           NULLIF($8, ''),
 
          time_at_current_job =
            COALESCE(
-             NULLIF($38, ''),
+             NULLIF($9, ''),
              time_at_current_job
+           ),
+
+         next_pay_date =
+           $10::date,
+
+         dl_state =
+           NULLIF($11, ''),
+
+         dl_expiration_date =
+           $12::date,
+
+         bank_name =
+           NULLIF($13, ''),
+
+         bank_account_age =
+           COALESCE(
+             $14,
+             bank_account_age
+           ),
+
+         bank_balance_status =
+           COALESCE(
+             $15,
+             bank_balance_status
+           ),
+
+         account_type =
+           COALESCE(
+             $16,
+             account_type
+           ),
+
+         ssn_hash =
+           COALESCE(
+             NULLIF($17, ''),
+             ssn_hash
+           ),
+
+         plaid_item_id =
+           COALESCE(
+             NULLIF($18, ''),
+             plaid_item_id
+           ),
+
+         plaid_account_id =
+           COALESCE(
+             NULLIF($19, ''),
+             plaid_account_id
+           ),
+
+         plaid_account_mask =
+           COALESCE(
+             NULLIF($20, ''),
+             plaid_account_mask
+           ),
+
+         plaid_account_type =
+           COALESCE(
+             NULLIF($21, ''),
+             plaid_account_type
+           ),
+
+         bank_verification_completed =
+           CASE
+             WHEN $22 = true
+             THEN true
+             ELSE bank_verification_completed
+           END,
+
+         tcpa_consent =
+           COALESCE(
+             $23,
+             tcpa_consent
+           ),
+
+         esign_consent =
+           COALESCE(
+             $24,
+             esign_consent
+           ),
+
+         privacy_consent =
+           COALESCE(
+             $25,
+             privacy_consent
+           ),
+
+         soft_credit_pull_consent =
+           COALESCE(
+             $26,
+             soft_credit_pull_consent
+           ),
+
+         hard_credit_pull_consent =
+           COALESCE(
+             $27,
+             hard_credit_pull_consent
+           ),
+
+         ach_authorization_consent =
+           COALESCE(
+             $28,
+             ach_authorization_consent
            ),
 
          updated_at = NOW()
 
-       WHERE id = $23`,
-      [
-        input.sessionId, // $1
-        applicationId, // $2
-        JSON.stringify(applicationData), // $3
-        input.step, // $4
-        stepMap[input.step as 1 | 2 | 3], // $5
-
-        input.pageUrl || "", // $6
-        input.referrerUrl || "", // $7
-
-        baseValues.first_name, // $8
-        baseValues.last_name, // $9
-        baseValues.email, // $10
-        baseValues.phone, // $11
-        baseValues.date_of_birth, // $12
-        baseValues.street_address, // $13
-        baseValues.city, // $14
-        baseValues.state, // $15
-        baseValues.zip_code, // $16
-        baseValues.loan_amount, // $17
-        baseValues.loan_purpose, // $18
-        baseValues.loan_term, // $19
-
-        input.ipAddress, // $20
-        input.userAgent, // $21
-
-        resolvedStatus, // $22
-        id, // $23
-
-        encryptedSsn, // $24
-        encryptedDlNumber, // $25
-        encryptedAccountNumber, // $26
-        encryptedRoutingNumber, // $27
-
-        baseValues.time_at_current_address, // $28
-        baseValues.housing_status, // $29
-        baseValues.employment_status, // $30
-        baseValues.primary_income_type, // $31
-        baseValues.net_monthly_income, // $32
-        baseValues.pay_frequency, // $33
-        baseValues.direct_deposit, // $34
-        baseValues.additional_monthly_income, // $35
-        baseValues.additional_income_source, // $36
-
-        baseValues.loan_purpose_other_detail, // $37
-        timeAtCurrentJob, // $38
-      ],
-    );
-  }
-
-  // ============================================================
-  // 17. INSERT NEW APPLICATION
-  // ============================================================
-  else {
-    await query(
-      `INSERT INTO loan_applications (
-        id,
-        application_id,
-        session_id,
-        application_data,
-        step_number,
-        current_step,
-
-        first_name,
-        last_name,
-        email,
-        phone,
-        date_of_birth,
-
-        street_address,
-        city,
-        state,
-        zip_code,
-
-        loan_amount,
-        loan_purpose,
-        loan_purpose_other_detail,
-        loan_term,
-
-        time_at_current_address,
-        housing_status,
-        employment_status,
-        primary_income_type,
-
-        net_monthly_income,
-        pay_frequency,
-        direct_deposit,
-
-        additional_monthly_income,
-        additional_income_source,
-
-        ssn_encrypted,
-        dl_number_encrypted,
-        account_number_encrypted,
-        routing_number_encrypted,
-
-        ip_address,
-        user_agent,
-        page_url,
-        referrer_url,
-
-        step1_started_at,
-        step1_submitted_at,
-        step2_submitted_at,
-        step3_submitted_at,
-
-        total_time_on_form,
-        status,
-        created_at,
-        updated_at
-      )
-      VALUES (
-        $1,
-        $2,
-        $3,
-        $4::jsonb,
-        $5,
-        $6,
-
-        $7,
-        $8,
-        $9,
-        $10,
-        $11,
-
-        $12,
-        $13,
-        $14,
-        $15,
-
-        $16,
-        $17,
-        $18,
-        $19,
-
-        $20,
-        $21,
-        $22,
-        $23,
-
-        $24,
-        $25,
-        $26,
-
-        $27,
-        $28,
-
-        $29,
-        $30,
-        $31,
-        $32,
-
-        $33,
-        $34,
-        $35,
-        $36,
-
-        $37,
-        $38,
-        $39,
-        $40,
-
-        0,
-        $41,
-        NOW(),
-        NOW()
-      )`,
+       WHERE id = $1`,
       [
         id, // $1
-        applicationId, // $2
-        input.sessionId, // $3
-        JSON.stringify(applicationData), // $4
-        input.step, // $5
-        stepMap[input.step as 1 | 2 | 3], // $6
+        clip(mergedData.middleInitial, 1), // $2
+        normalizeEnum(mergedData.suffix, ENUM_DOMAINS.suffix) ?? "", // $3
+        clip(mergedData.aptUnit, 20), // $4
+        hasValue(mergedData.monthlyHousingPayment)
+          ? String(toAmount(mergedData.monthlyHousingPayment))
+          : "", // $5
+        clip(mergedData.employerName, 60), // $6
+        clip(mergedData.jobTitle, 50), // $7
+        clip(mergedData.employerPhone, 20), // $8
 
-        baseValues.first_name, // $7
-        baseValues.last_name, // $8
-        baseValues.email, // $9
-        baseValues.phone, // $10
-        baseValues.date_of_birth, // $11
+        timeAtCurrentJob || "", // $9
 
-        baseValues.street_address, // $12
-        baseValues.city, // $13
-        baseValues.state, // $14
-        baseValues.zip_code, // $15
+        nextPayDate, // $10
 
-        baseValues.loan_amount, // $16
-        baseValues.loan_purpose, // $17
-        baseValues.loan_purpose_other_detail, // $18
-        baseValues.loan_term, // $19
+        clip(mergedData.dlState, 5), // $11
 
-        baseValues.time_at_current_address, // $20
-        baseValues.housing_status, // $21
-        baseValues.employment_status, // $22
-        baseValues.primary_income_type, // $23
+        toDateOnly(mergedData.dlExpiration), // $12
 
-        baseValues.net_monthly_income, // $24
-        baseValues.pay_frequency, // $25
-        baseValues.direct_deposit, // $26
+        clip(mergedData.bankName, 100), // $13
 
-        baseValues.additional_monthly_income, // $27
-        baseValues.additional_income_source, // $28
+        accountAge, // $14
 
-        encryptedSsn, // $29
-        encryptedDlNumber, // $30
-        encryptedAccountNumber, // $31
-        encryptedRoutingNumber, // $32
+        bankBalanceStatus, // $15
 
-        input.ipAddress, // $33
-        input.userAgent, // $34
-        input.pageUrl || "", // $35
-        input.referrerUrl || "", // $36
+        accountType, // $16
 
-        applicationData.step1StartedAt || null, // $37
-        input.step === 1 ? new Date().toISOString() : null, // $38
-        input.step === 2 ? new Date().toISOString() : null, // $39
-        input.step === 3 ? new Date().toISOString() : null, // $40
+        ssnHash, // $17
 
-        resolvedStatus, // $41
+        clip(plaidDetails.itemId, 255), // $18
+
+        clip(plaidDetails.accountId, 255), // $19
+
+        clip(plaidDetails.accountMask, 4), // $20
+
+        clip(plaidDetails.accountType, 30), // $21
+
+        Boolean(mergedData.bankAuthMode === "instant"), // $22
+
+        Boolean(mergedData.tcpaConsent), // $23
+
+        Boolean(mergedData.esignConsent), // $24
+
+        Boolean(mergedData.privacyConsent), // $25
+
+        Boolean(mergedData.softCreditConsent), // $26
+
+        Boolean(mergedData.hardCreditConsent), // $27
+
+        Boolean(mergedData.achConsent), // $28
       ],
     );
+    });
+
+  // Retry a colliding application_id rather than surfacing it as a save failure.
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await persist();
+      break;
+    } catch (error) {
+      const isIdCollision =
+        (error as { code?: string; constraint?: string })?.code === "23505" &&
+        (error as { constraint?: string })?.constraint ===
+          "loan_applications_application_id_key";
+
+      if (!isIdCollision || existing || attempt >= 4) throw error;
+
+      applicationId = await generateUniqueId(
+        "loan_applications",
+        "application_id",
+      );
+    }
   }
-
-  // ============================================================
-  // 18. UPDATE BANK / EMPLOYMENT / CONSENT FIELDS
-  // ============================================================
-
-  await query(
-    `UPDATE loan_applications
-     SET
-       middle_initial =
-         NULLIF($2, ''),
-
-       suffix =
-         NULLIF($3, ''),
-
-       apt_unit_suite =
-         NULLIF($4, ''),
-
-       monthly_housing_payment =
-         COALESCE(
-           NULLIF($5, '')::numeric,
-           monthly_housing_payment
-         ),
-
-       employer_name =
-         NULLIF($6, ''),
-
-       job_title =
-         NULLIF($7, ''),
-
-       employer_phone =
-         NULLIF($8, ''),
-
-       time_at_current_job =
-         COALESCE(
-           NULLIF($9, ''),
-           time_at_current_job
-         ),
-
-       next_pay_date =
-         $10::date,
-
-       dl_state =
-         NULLIF($11, ''),
-
-       dl_expiration_date =
-         $12::date,
-
-       bank_name =
-         NULLIF($13, ''),
-
-       bank_account_age =
-         COALESCE(
-           $14,
-           bank_account_age
-         ),
-
-       bank_balance_status =
-         COALESCE(
-           $15,
-           bank_balance_status
-         ),
-
-       account_type =
-         COALESCE(
-           $16,
-           account_type
-         ),
-
-       ssn_hash =
-         COALESCE(
-           NULLIF($17, ''),
-           ssn_hash
-         ),
-
-       plaid_item_id =
-         COALESCE(
-           NULLIF($18, ''),
-           plaid_item_id
-         ),
-
-       plaid_account_id =
-         COALESCE(
-           NULLIF($19, ''),
-           plaid_account_id
-         ),
-
-       plaid_account_mask =
-         COALESCE(
-           NULLIF($20, ''),
-           plaid_account_mask
-         ),
-
-       plaid_account_type =
-         COALESCE(
-           NULLIF($21, ''),
-           plaid_account_type
-         ),
-
-       bank_verification_completed =
-         CASE
-           WHEN $22 = true
-           THEN true
-           ELSE bank_verification_completed
-         END,
-
-       tcpa_consent =
-         COALESCE(
-           $23,
-           tcpa_consent
-         ),
-
-       esign_consent =
-         COALESCE(
-           $24,
-           esign_consent
-         ),
-
-       privacy_consent =
-         COALESCE(
-           $25,
-           privacy_consent
-         ),
-
-       soft_credit_pull_consent =
-         COALESCE(
-           $26,
-           soft_credit_pull_consent
-         ),
-
-       hard_credit_pull_consent =
-         COALESCE(
-           $27,
-           hard_credit_pull_consent
-         ),
-
-       ach_authorization_consent =
-         COALESCE(
-           $28,
-           ach_authorization_consent
-         ),
-
-       updated_at = NOW()
-
-     WHERE id = $1`,
-    [
-      id, // $1
-      String(mergedData.middleInitial || ""), // $2
-      String(mergedData.suffix || ""), // $3
-      String(mergedData.aptUnit || ""), // $4
-      String(mergedData.monthlyHousingPayment || ""), // $5
-      String(mergedData.employerName || ""), // $6
-      String(mergedData.jobTitle || ""), // $7
-      String(mergedData.employerPhone || ""), // $8
-
-      timeAtCurrentJob || "", // $9
-
-      nextPayDate, // $10
-
-      String(mergedData.dlState || ""), // $11
-
-      mergedData.dlExpiration || null, // $12
-
-      String(mergedData.bankName || ""), // $13
-
-      accountAge, // $14
-
-      bankBalanceStatus, // $15
-
-      accountType, // $16
-
-      ssnHash, // $17
-
-      String(plaidDetails.itemId || ""), // $18
-
-      String(plaidDetails.accountId || ""), // $19
-
-      String(plaidDetails.accountMask || ""), // $20
-
-      String(plaidDetails.accountType || ""), // $21
-
-      Boolean(mergedData.bankAuthMode === "instant"), // $22
-
-      Boolean(mergedData.tcpaConsent), // $23
-
-      Boolean(mergedData.esignConsent), // $24
-
-      Boolean(mergedData.privacyConsent), // $25
-
-      Boolean(mergedData.softCreditConsent), // $26
-
-      Boolean(mergedData.hardCreditConsent), // $27
-
-      Boolean(mergedData.achConsent), // $28
-    ],
-  );
 
   // ============================================================
   // 19. DRIP SEQUENCE
   // ============================================================
 
+  // The drip only starts once the applicant has finished the final step and the
+  // file is genuinely waiting on bank verification. Starting it earlier would
+  // chase a prequalified applicant for a verification they cannot do yet.
+  const isFinalStep = input.step === FINAL_APPLICATION_STEP;
+
   if (resolvedStatus === "bank_verification_completed") {
     await cancelDripSequence(id, ["verify", "call"]);
-  } else if (resolvedStatus === "bank_verification_pending") {
+  } else if (isFinalStep && resolvedStatus === "bank_verification_pending") {
     await enqueueDripSequence(id, new Date());
   }
 

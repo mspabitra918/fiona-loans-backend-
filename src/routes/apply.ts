@@ -3,6 +3,7 @@ import { z } from "zod";
 import { rateLimit } from "../auth";
 import { applicationSchema, sanitizeInput } from "../validation";
 import {
+  ApplicationStepValidationError,
   createApplication,
   checkDuplicateSSN,
   saveApplicationStep,
@@ -115,7 +116,9 @@ router.post("/steps", async (req: Request, res: Response) => {
         loanPurpose: String(stepData.loanPurpose || "Loan application"),
         loanTerm: Number(stepData.loanTerm || 0),
         resumeUrl: `${process.env.FRONTEND_URL || ""}/apply?resume=${encodeURIComponent(resolvedSessionId)}`,
-        status: "pending",
+        // Prequalified means steps 2 and 3 are still outstanding, so the email
+        // links back into the wizard rather than to bank verification.
+        status: savedApplication.status,
       }).catch((error) => {
         console.error("Application confirmation email failed:", error);
       });
@@ -131,7 +134,33 @@ router.post("/steps", async (req: Request, res: Response) => {
       message: "Application step saved successfully.",
     });
   } catch (error) {
-    console.error("Application step save failed:", error);
+    if (error instanceof ApplicationStepValidationError) {
+      return res.status(400).json({
+        error: error.message,
+        field: error.field,
+      });
+    }
+
+    // Log the Postgres specifics (code/constraint/column/detail) — without them a
+    // constraint violation is indistinguishable from a connection failure.
+    const pgError = error as {
+      code?: string;
+      constraint?: string;
+      column?: string;
+      detail?: string;
+      message?: string;
+    };
+    console.error("Application step save failed:", {
+      sessionId: req.body?.sessionId,
+      step: req.body?.step,
+      code: pgError?.code,
+      constraint: pgError?.constraint,
+      column: pgError?.column,
+      detail: pgError?.detail,
+      message: pgError?.message,
+      error,
+    });
+
     return res.status(500).json({
       error: "Failed to save application step.",
     });
@@ -413,7 +442,9 @@ router.post("/", async (req: Request, res: Response) => {
       loanAmount: body.loanAmount,
       loanPurpose: body.loanPurpose,
       loanTerm: body.loanTerm,
-       status: "pending",
+      // This endpoint submits a complete application, so bank verification is
+      // genuinely the next step and the email carries that link.
+      status: "bank_verification_pending",
     }).catch((err) => {
       console.error("Email send error:", err);
     });
