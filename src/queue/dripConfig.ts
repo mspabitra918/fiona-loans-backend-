@@ -1,21 +1,20 @@
 /**
  * Drip email schedule.
  *
- * Both tracks are anchored to lead submission and start together, but they are
- * governed differently:
+ * Both tracks are anchored to lead submission, start together, and are gated on
+ * the same status: `bank_verification_pending`. They only fire while the
+ * application is still sitting in that status — the moment it moves on (most
+ * often to `bank_verification_completed`, but any other status counts), the
+ * pending jobs for BOTH tracks are dropped (see `cancelDripSequence`) and the
+ * worker re-checks the live status as a backstop.
  *
- *   "verify" — gated on status `bank_verification_pending`. It only fires while
- *   the application is still sitting in that status; the moment it moves, the
- *   pending jobs are dropped (see `cancelDripSequence`) and the worker re-checks
- *   the live status as a backstop.
+ *   "verify"
  *     E1  T+0     Application submitted (call us to finalize)
  *     E2  T+2h    Secure bank verification link
  *     E3-E7       Verification reminder, every 12h for 3 days
  *     E8  T+74h   Final cancellation notice
  *
- *   "call" — NOT gated on status. The borrower has to call underwriting no
- *   matter where the file sits, so this track runs to completion regardless of
- *   status changes.
+ *   "call"
  *     E11-E14     Call reminder, every 12h for 2 days
  *
  * Email numbers are globally unique across tracks because they are the
@@ -28,16 +27,13 @@ export type DripTrack = "verify" | "call";
 
 export const DRIP_TRACKS: DripTrack[] = ["verify", "call"];
 
-/**
- * The loan status during which each track is allowed to run, or `null` for a
- * track that runs regardless of status.
- */
+/** The loan status during which each track is allowed to run. */
 export const DRIP_TRACK_STATUS: Record<DripTrack, string> = {
   verify: "bank_verification_pending",
   call: "bank_verification_pending",
 };
 
-/** The status the verification track runs in. */
+/** The status both drip tracks run in. */
 export const DRIP_ACTIVE_STATUS = "bank_verification_pending";
 
 export interface DripStep {
@@ -69,10 +65,10 @@ export const VERIFY_TRACK_STEPS: DripStep[] = [
   { emailNumber: 8, track: "verify", afterMs: 74 * HOUR },
 ];
 
-// /**
-//  * Call track. Offsets are from lead submission, same anchor as the verify
-//  * track, and run for 2 days irrespective of the application's status.
-//  */
+/**
+ * Call track. Offsets are from lead submission, the same anchor as the verify
+ * track, and it is gated on the same status.
+ */
 export const CALL_TRACK_STEPS: DripStep[] = [
   { emailNumber: 11, track: "call", afterMs: 12 * HOUR },
   { emailNumber: 12, track: "call", afterMs: 24 * HOUR },
@@ -111,16 +107,12 @@ export function stepForEmailNumber(emailNumber: number): DripStep | undefined {
   return DRIP_STEPS.find((step) => step.emailNumber === emailNumber);
 }
 
-/**
- * Whether a track may keep sending while the application sits in `status`.
- * Ungated tracks (`DRIP_TRACK_STATUS[track] === null`) are always allowed.
- */
+/** Whether a track may keep sending while the application sits in `status`. */
 export function isTrackAllowedInStatus(
   track: DripTrack,
   status: string,
 ): boolean {
-  const requiredStatus = DRIP_TRACK_STATUS[track];
-  return requiredStatus === null || requiredStatus === status;
+  return DRIP_TRACK_STATUS[track] === status;
 }
 
 /** Tracks that must be cancelled because `status` locks them out. */

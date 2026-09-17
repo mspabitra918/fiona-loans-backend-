@@ -9,9 +9,10 @@ import { randomUUID } from "node:crypto";
 import { validate as isUuid } from "uuid";
 
 /**
- * Cancels the drip tracks a new status locks out. Only status-gated tracks are
- * touched — the call track is ungated, so it keeps running wherever the file
- * ends up. Never throws — drip bookkeeping must not fail a status update.
+ * Cancels the drip tracks a new status locks out. Both the verify and call
+ * tracks are gated on `bank_verification_pending`, so any other status — most
+ * commonly `bank_verification_completed` — drops both. Never throws: drip
+ * bookkeeping must not fail a status update.
  */
 async function syncDripTracksForStatus(
   id: string,
@@ -2205,8 +2206,8 @@ export async function updateApplicationStatus(
 
   // Instant kill-switch: the moment an application leaves a track's status,
   // drop that track's pending reminders so a borrower who just verified never
-  // receives a stale "still pending" email. Entering
-  // `bank_verification_completed` also starts the "call underwriting" track.
+  // receives a stale "still pending" or "call us" email. Entering
+  // `bank_verification_completed` therefore stops both tracks.
   if (updated) {
     await syncDripTracksForStatus(internalId, status);
   }

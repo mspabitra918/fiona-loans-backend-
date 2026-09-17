@@ -85,9 +85,9 @@ export async function enqueueDripTrack(
 
 /**
  * Starts every drip track for a freshly-submitted application. Both tracks share
- * the submission anchor: the verify track is dropped as soon as the application
- * leaves `bank_verification_pending`, while the call track runs to completion
- * whatever the status becomes.
+ * the submission anchor and the same gate: both are dropped as soon as the
+ * application leaves `bank_verification_pending` (e.g. once it becomes
+ * `bank_verification_completed`).
  */
 export async function enqueueDripSequence(
   applicationId: string,

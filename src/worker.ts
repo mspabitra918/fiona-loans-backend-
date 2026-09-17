@@ -66,8 +66,9 @@ async function processDripJob(job: Job<DripJobData>): Promise<void> {
     return;
   }
 
-  // KILL-SWITCH: for a status-gated track, only send while the application is
-  // still in that status. Ungated tracks (the call track) always pass.
+  // KILL-SWITCH: only send while the application is still in the status its
+  // track is gated on. Both tracks are gated on `bank_verification_pending`, so
+  // a file that has moved on (e.g. `bank_verification_completed`) sends nothing.
   if (!isTrackAllowedInStatus(step.track, application.status)) {
     console.log(
       `[drip] application ${applicationId} is now "${application.status}" (${step.track} track needs "${DRIP_TRACK_STATUS[step.track]}") — skipping email ${emailNumber}`,

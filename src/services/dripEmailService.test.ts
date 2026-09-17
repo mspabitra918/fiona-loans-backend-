@@ -154,19 +154,32 @@ async function main() {
     DRIP_STEPS.length,
   );
 
-  // The verify track is status-gated; the call track runs whatever the status.
+  // Both tracks are gated on `bank_verification_pending`: once the file moves on
+  // — above all to `bank_verification_completed` — neither may send again.
   assert.equal(
     isTrackAllowedInStatus("verify", "bank_verification_pending"),
     true,
   );
-  assert.equal(isTrackAllowedInStatus("verify", "funded"), false);
   assert.equal(
     isTrackAllowedInStatus("call", "bank_verification_pending"),
     true,
   );
-  assert.equal(isTrackAllowedInStatus("call", "declined"), true);
+  assert.equal(
+    isTrackAllowedInStatus("verify", "bank_verification_completed"),
+    false,
+  );
+  assert.equal(
+    isTrackAllowedInStatus("call", "bank_verification_completed"),
+    false,
+  );
+  assert.equal(isTrackAllowedInStatus("verify", "funded"), false);
+  assert.equal(isTrackAllowedInStatus("call", "declined"), false);
   assert.deepEqual(tracksBlockedByStatus("bank_verification_pending"), []);
-  assert.deepEqual(tracksBlockedByStatus("funded"), ["verify"]);
+  assert.deepEqual(tracksBlockedByStatus("bank_verification_completed"), [
+    "verify",
+    "call",
+  ]);
+  assert.deepEqual(tracksBlockedByStatus("funded"), ["verify", "call"]);
   assert.equal(stepForEmailNumber(11)?.track, "call");
   assert.equal(stepForEmailNumber(99), undefined);
 

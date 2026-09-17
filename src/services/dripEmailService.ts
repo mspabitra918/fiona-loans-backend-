@@ -10,7 +10,7 @@ import { sendMailgunEmail } from "./emailService";
  *   3-7    verification reminder (same copy, repeats every 12h)
  *   8      final cancellation notice
  *
- * Call track (status `bank_verification_completed`):
+ * Call track (status `bank_verification_pending`):
  *   11-14  reminder to call underwriting (same copy, repeats every 12h)
  *
  * The verification CTA is a one-click deep link to the bank verification screen
