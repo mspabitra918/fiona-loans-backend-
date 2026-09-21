@@ -21,6 +21,9 @@ const router = Router();
 
 const stepSubmissionSchema = z.object({
   sessionId: z.string().min(1).optional(),
+  // The 5-digit code a returning client already holds. Lets the save re-attach
+  // to that application when the session id did not survive the tab closing.
+  applicationId: z.string().min(1).optional(),
   step: z.number().int().min(1).max(3),
   data: z.object({}).passthrough().default({}),
 });
@@ -41,7 +44,7 @@ router.post("/steps", async (req: Request, res: Response) => {
       req.ip ||
       "unknown";
 
-    const { sessionId, step, data } = parsed.data;
+    const { sessionId, applicationId, step, data } = parsed.data;
     const userAgent = (req.headers["user-agent"] as string) || "unknown";
     const resolvedSessionId = sessionId || crypto.randomUUID();
     const stepData: Record<string, unknown> = { ...data };
@@ -67,7 +70,12 @@ router.post("/steps", async (req: Request, res: Response) => {
         identity,
         resolvedSessionId,
       );
-      if (duplicate) {
+      // A returning applicant whose session id was lost matches their own row
+      // here. That is a resume, not a second application, so only reject when
+      // the match is an application this client has never been handed.
+      const isOwnApplication =
+        !!applicationId && duplicate?.applicationId === applicationId;
+      if (duplicate && !isOwnApplication) {
         return res.status(409).json({
           error:
             "An application with these contact and identity details already exists.",
@@ -99,6 +107,7 @@ router.post("/steps", async (req: Request, res: Response) => {
 
     const savedApplication = await saveApplicationStep({
       sessionId: resolvedSessionId,
+      applicationId,
       step,
       data: stepData,
       ipAddress: ip,

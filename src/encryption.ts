@@ -38,26 +38,54 @@ export function encrypt(plaintext: string): string {
   return Buffer.concat([salt, iv, tag, encrypted]).toString("base64");
 }
 
-export function decrypt(ciphertext: string): string {
+export function decrypt(ciphertext: string | null | undefined): string | null {
   if (!ENCRYPTION_KEY) {
     throw new Error("ENCRYPTION_KEY environment variable is not set");
   }
 
-  const data = Buffer.from(ciphertext, "base64");
+  // Handle NULL / empty database values
+  if (!ciphertext) {
+    return null;
+  }
 
-  const salt = data.subarray(0, SALT_LENGTH);
-  const iv = data.subarray(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
-  const tag = data.subarray(
-    SALT_LENGTH + IV_LENGTH,
-    SALT_LENGTH + IV_LENGTH + TAG_LENGTH,
-  );
-  const encrypted = data.subarray(SALT_LENGTH + IV_LENGTH + TAG_LENGTH);
+  try {
+    const data = Buffer.from(ciphertext, "base64");
 
-  const key = deriveKey(salt);
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-  decipher.setAuthTag(tag);
+    // Validate minimum encrypted payload size
+    const minimumLength = SALT_LENGTH + IV_LENGTH + TAG_LENGTH;
 
-  return decipher.update(encrypted) + decipher.final("utf8");
+    if (data.length < minimumLength) {
+      console.error("Invalid encrypted data: payload is too short");
+      return null;
+    }
+
+    const salt = data.subarray(0, SALT_LENGTH);
+
+    const iv = data.subarray(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+
+    const tag = data.subarray(
+      SALT_LENGTH + IV_LENGTH,
+      SALT_LENGTH + IV_LENGTH + TAG_LENGTH,
+    );
+
+    const encrypted = data.subarray(SALT_LENGTH + IV_LENGTH + TAG_LENGTH);
+
+    const key = deriveKey(salt);
+
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+
+    decipher.setAuthTag(tag);
+
+    const decrypted = Buffer.concat([
+      decipher.update(encrypted),
+      decipher.final(),
+    ]);
+
+    return decrypted.toString("utf8");
+  } catch (error) {
+    console.error("Decryption failed:", error);
+    return null;
+  }
 }
 
 // export function validateEncryptionKey(): void {

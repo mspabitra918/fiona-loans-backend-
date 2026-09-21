@@ -81,9 +81,10 @@ router.get("/lookup", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Application not found" });
     }
 
-    // Return safe, read-only fields
+    // Return safe, read-only fields. `applicationId` is the public 5-digit
+    // code — the internal UUID never leaves the server.
     return res.json({
-      applicationId: application.id,
+      applicationId: application.application_id,
       application_id: application.application_id,
       firstName: application.first_name,
       lastName: application.last_name,
@@ -429,11 +430,17 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
+    // `body.applicationId` may be the 5-digit code or a legacy UUID. Every
+    // write below keys off the resolved internal UUID, which is what the
+    // bank_verification / audit_log foreign keys actually reference.
+    const internalId = application.id;
+    const publicApplicationId = application.application_id;
+
     // Upsert bank verification record
     let verificationId: string;
     try {
       const result = await upsertBankVerification({
-        applicationId: body.applicationId,
+        applicationId: internalId,
         bankName: body.bankName,
         accountType: accountType,
         accountNumber: accountNumber,
@@ -458,7 +465,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     // Set flag in database (if applicable)
     try {
-      await markBankVerificationUploaded(body.applicationId);
+      await markBankVerificationUploaded(internalId);
     } catch (flagError) {
       console.warn(
         "Failed to set bank_verification_completed flag:",
@@ -469,7 +476,7 @@ router.post("/", async (req: Request, res: Response) => {
     // Update application status
     try {
       await updateApplicationStatus(
-        body.applicationId,
+        internalId,
         "bank_verification_completed",
         "system",
       );
@@ -487,7 +494,7 @@ router.post("/", async (req: Request, res: Response) => {
           `**Account Type:** ${accountType}\n` +
           `**Account Age:** ${bankAccountAge || "N/A"}\n` +
           `**Balance Status:** ${bankBalanceStatus || "N/A"}\n` +
-          `**Application ID:** ${body.applicationId}\n` +
+          `**Application ID:** ${publicApplicationId}\n` +
           `**Verification ID:** ${verificationId}`,
       );
     } catch (err) {

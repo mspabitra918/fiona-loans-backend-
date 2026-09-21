@@ -65,6 +65,12 @@ export interface CreateApplicationInput {
 
 export interface SaveApplicationStepInput {
   sessionId: string;
+  /**
+   * The public 5-digit code the client already holds, when it has one. Used as a
+   * fallback key so a client that lost its session id still updates its own row
+   * rather than starting a second application.
+   */
+  applicationId?: string;
   step: number;
   data: Record<string, unknown>;
   ipAddress: string;
@@ -519,6 +525,66 @@ export async function findRecentDecline(
   );
 }
 
+/**
+ * Rows that are still mid-wizard and may therefore be resumed. Anything past
+ * bank verification is a decided application: a late step save must never
+ * reopen one.
+ */
+const RESUMABLE_STATUSES = ["draft", "prequalified", "identity_verified"];
+
+interface ExistingApplicationRow {
+  id: string;
+  application_id: string;
+  application_data: Record<string, unknown>;
+  step_number: number;
+  session_id: string;
+  status: string;
+}
+
+const EXISTING_APPLICATION_COLUMNS = `
+  id,
+  application_id,
+  application_data,
+  step_number,
+  session_id,
+  status
+`;
+
+/**
+ * Last-resort lookup for a step 2/3 save whose session id and application id
+ * are both gone — a resume from another device, or after site data was cleared.
+ * Matching on the same four identity fields as the step 1 duplicate guard keeps
+ * the applicant on the row step 1 created instead of forking a new one.
+ */
+export async function findResumableApplicationByIdentity(
+  identity: ApplicantIdentityMatch,
+): Promise<ExistingApplicationRow | null> {
+  const dateOfBirth = toDateOnly(identity.dateOfBirth);
+  if (!identity.email.trim() || !identity.lastName.trim() || !dateOfBirth) {
+    return null;
+  }
+
+  return queryOne<ExistingApplicationRow>(
+    `SELECT ${EXISTING_APPLICATION_COLUMNS}
+     FROM loan_applications
+     WHERE LOWER(email) = LOWER($1)
+       AND REGEXP_REPLACE(phone, '[^0-9]', '', 'g') = REGEXP_REPLACE($2, '[^0-9]', '', 'g')
+       AND date_of_birth = $3::date
+       AND LOWER(last_name) = LOWER($4)
+       AND status = ANY($5::text[])
+       AND created_at >= NOW() - INTERVAL '30 days'
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [
+      identity.email.trim(),
+      identity.phone,
+      dateOfBirth,
+      identity.lastName.trim(),
+      RESUMABLE_STATUSES,
+    ],
+  );
+}
+
 export interface SoftPullDecision {
   decision: "prequalified" | "declined";
   reason: string;
@@ -596,21 +662,8 @@ export async function saveApplicationStep(
   // 1. FIND EXISTING APPLICATION
   // ============================================================
 
-  const existing = await queryOne<{
-    id: string;
-    application_id: string;
-    application_data: Record<string, unknown>;
-    step_number: number;
-    session_id: string;
-    status: string;
-  }>(
-    `SELECT
-       id,
-       application_id,
-       application_data,
-       step_number,
-       session_id,
-       status
+  let existing = await queryOne<ExistingApplicationRow>(
+    `SELECT ${EXISTING_APPLICATION_COLUMNS}
      FROM loan_applications
      WHERE session_id = $1
         OR id::text = $1
@@ -618,6 +671,32 @@ export async function saveApplicationStep(
      LIMIT 1`,
     [input.sessionId],
   );
+
+  // The session id is the primary key of the wizard, but it does not always
+  // survive the round trip — a closed tab, a cleared browser, a different
+  // device. Each fallback below re-attaches the save to the row step 1 created;
+  // without them the row is missing and a second application gets minted with
+  // its own number and status, which is what admins saw as duplicates.
+  if (!existing && input.applicationId) {
+    existing = await queryOne<ExistingApplicationRow>(
+      `SELECT ${EXISTING_APPLICATION_COLUMNS}
+       FROM loan_applications
+       WHERE application_id = $1
+         AND status = ANY($2::text[])
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [input.applicationId, RESUMABLE_STATUSES],
+    );
+  }
+
+  if (!existing && input.step > 1) {
+    existing = await findResumableApplicationByIdentity({
+      email: String(input.data.email || ""),
+      phone: String(input.data.mobilePhone || input.data.phone || ""),
+      dateOfBirth: String(input.data.dob || input.data.dateOfBirth || ""),
+      lastName: String(input.data.lastName || ""),
+    });
+  }
 
   // ============================================================
   // 2. MERGE APPLICATION DATA
@@ -1662,6 +1741,7 @@ export interface ApplicationRow {
 }
 export interface ApplicationRowExport {
   id: string;
+  application_id: string;
   first_name: string;
   last_name: string;
   email: string;

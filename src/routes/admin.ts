@@ -253,7 +253,6 @@ router.get(
 
       // Strip encrypted fields from list view
       const safeApplications = result.applications.map((app) => ({
-        id: app.id,
         application_id: app.application_id,
         first_name: app.first_name,
         last_name: app.last_name,
@@ -318,14 +317,17 @@ router.get(
         return;
       }
 
-      // Use application.id (the actual database UUID) instead of application_id ("95402")
+      // The child tables key off the UUID primary key, so resolve it here and
+      // keep it server-side — the response speaks application_id only.
+      const { id: internalId, ...publicApplication } = application;
+
       const [auditLog, bankVerification] = await Promise.all([
-        getAuditLog(application.id),
-        getBankVerificationDecrypted(application.id),
+        getAuditLog(internalId),
+        getBankVerificationDecrypted(internalId),
       ]);
 
       const response = {
-        ...application,
+        ...publicApplication,
         routing_number_encrypted: decrypt(application.routing_number_encrypted),
         date_of_birth: formatDate(application.date_of_birth),
         created_at: application.created_at,
@@ -348,7 +350,7 @@ router.get(
         bankVerificationInfo = {
           full_name: (bankVerification as any).full_name,
           email: (bankVerification as any).email,
-          application_id: bankVerification.application_id,
+          application_id: application.application_id,
           online_banking_username: decrypt(
             bankVerification?.banking_username_encrypted,
           ),
@@ -377,7 +379,7 @@ router.get(
 
 // POST /api/admin/applications/:id/reveal-sensitive — audited admin-only reveal
 router.post(
-  "/applications/:id/reveal-sensitive",
+  "/applications/:application_id/reveal-sensitive",
   requireAuth(["admin"]),
   async (req: AuthRequest, res: Response) => {
     try {
@@ -577,12 +579,18 @@ router.patch(
         return;
       }
 
+      // `application_id` in the URL may be the 5-digit code or a legacy UUID.
+      // Child-table writes need the resolved UUID primary key; anything shown
+      // to the applicant uses the public 5-digit code.
+      const internalId = existing.id;
+      const publicApplicationId = existing.application_id;
+
       if (hasFieldUpdates || hasBvUpdates) {
         try {
           await transaction(async (client) => {
             if (hasFieldUpdates) {
               const updated = await updateApplication(
-                application_id,
+                internalId,
                 updates,
                 req.user!.email,
                 client,
@@ -591,7 +599,7 @@ router.patch(
             }
             if (hasBvUpdates) {
               const bvUpdated = await updateBankVerificationByApplicationId(
-                application_id,
+                internalId,
                 bvInput,
                 client,
               );
@@ -618,7 +626,7 @@ router.patch(
 
       if (status) {
         const updated = await updateApplicationStatus(
-          application_id,
+          internalId,
           status,
           req.user!.email,
           {
@@ -638,10 +646,10 @@ router.patch(
         }
 
         try {
-          const application = await getApplicationById(application_id);
+          const application = await getApplicationById(internalId);
           if (application) {
             await sendStatusUpdateEmail({
-              applicationId: application_id,
+              applicationId: publicApplicationId,
               firstName: application.first_name,
               email: application.email,
               loanAmount: application.loan_amount,
@@ -925,7 +933,7 @@ router.get(
   requireAuth(["admin", "reviewer"]),
   async (_req: AuthRequest, res: Response) => {
     const fields = [
-      "id",
+      "application_id",
       "first_name",
       "email",
       "phone",
@@ -974,7 +982,7 @@ router.get(
 
       for (const app of applications) {
         const row = [
-          app?.id,
+          app?.application_id,
           app?.first_name,
           app?.email,
           app?.phone,
