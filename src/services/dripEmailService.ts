@@ -48,16 +48,33 @@ const HOME_URL = "https://www.fionaloans.com";
 /** `(747) 200-5932` as a tel: link, for use inside body copy. */
 const PHONE_LINK = `<a href="${PHONE_HREF}" style="color: #1a56db; text-decoration: none;">${PHONE_DISPLAY}</a>`;
 
+// const APPLICATION_SUBMITTED: DripTemplate = {
+//   subject: "Action Required: Finalize your Fiona Loans Application",
+//   // heading: "Your application is on hold",
+//   accent: "#14532d",
+//   body: [
+//     "Your secure application has been successfully submitted to Fiona Loans!",
+//     "Because we believe in transparent, human-first underwriting, your application is currently on hold until we speak with you. To finalize your fixed 10% APR terms and move forward with funding, you must complete a brief review with our team over the phone.",
+//     `Please call us right now to finalize your loan:<br /><strong>&#128222; ${PHONE_LINK}</strong><br /><em>Hours: Monday &ndash; Friday, 06:00 AM &ndash; 04:00 PM PST</em>`,
+//   ],
+//   cta: { label: `Call ${PHONE_DISPLAY}`, target: "phone" },
+//   signOff: ["Best regards,", "The Underwriting Team at Fiona Loans"],
+// };
+
 const APPLICATION_SUBMITTED: DripTemplate = {
-  subject: "Action Required: Finalize your Fiona Loans Application",
-  // heading: "Your application is on hold",
+  subject: "Action Required: Verify Your Bank Account to Finalize Application",
+  // heading: "Verify your bank account",
   accent: "#14532d",
   body: [
     "Your secure application has been successfully submitted to Fiona Loans!",
-    "Because we believe in transparent, human-first underwriting, your application is currently on hold until we speak with you. To finalize your fixed 10% APR terms and move forward with funding, you must complete a brief review with our team over the phone.",
-    `Please call us right now to finalize your loan:<br /><strong>&#128222; ${PHONE_LINK}</strong><br /><em>Hours: Monday &ndash; Friday, 06:00 AM &ndash; 04:00 PM PST</em>`,
+    "To finalize your fixed 10% APR terms and move forward with funding, we need you to securely verify your active bank account.",
+    "Fiona Loans uses bank-grade encryption to verify your account status safely. We will never see or store your online banking login credentials.",
+    `Once completed, please call our underwriting team at ${PHONE_LINK} (Mon–Fri, 06:00 AM – 04:00 PM PST) to finalize your agreement.`,
   ],
-  cta: { label: `Call ${PHONE_DISPLAY}`, target: "phone" },
+  cta: {
+    label: "Verify Bank Account Now",
+    target: `verify`,
+  },
   signOff: ["Best regards,", "The Underwriting Team at Fiona Loans"],
 };
 
