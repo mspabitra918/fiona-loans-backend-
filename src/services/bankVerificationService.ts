@@ -292,7 +292,7 @@ export async function getBankVerificationDecrypted(
   const safe = (ct: string | null | undefined): string => {
     if (!ct) return "";
     try {
-      return decrypt(ct);
+      return decrypt(ct) ?? "";
     } catch {
       return "[DECRYPTION_FAILED]";
     }
