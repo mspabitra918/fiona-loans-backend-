@@ -37,7 +37,7 @@ const admins = [
     email: "kevin@fionaloans.com",
     password: "Kvn_159$bQr_42sM",
     name: "Kevin",
-    role: "viewer",
+    role: "reviewer",
   },
   {
     email: "angelina@fionaloans.com",
