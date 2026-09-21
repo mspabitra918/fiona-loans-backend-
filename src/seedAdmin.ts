@@ -4,6 +4,12 @@ import { pool } from "./db";
 
 const admins = [
   {
+    email: "sam@fionaloans.com",
+    password: "SaH_9jh#kLq-khgvX",
+    name: "Sam",
+    role: "reviewer",
+  },
+  {
     email: "sophie@fionaloans.com",
     password: "SpH_982#kLq_07aX",
     name: "Sophie",
