@@ -7,6 +7,7 @@ import {
   createApplication,
   checkDuplicateSSN,
   saveApplicationStep,
+  submitApplication,
   findMatchingApplication,
   findRecentDecline,
   runMlaCoveredBorrowerCheck,
@@ -19,6 +20,200 @@ import { enqueueDripSequence } from "../queue/dripQueue";
 
 const router = Router();
 
+const applicantIdentitySchema = z.object({}).passthrough();
+
+const submitSchema = z.object({
+  // Carried through to application_data for traceability only — nothing is
+  // looked up by it, because the row is created once, by this request.
+  sessionId: z.string().min(1).optional(),
+  data: applicantIdentitySchema.default({}),
+});
+
+function clientIp(req: Request): string {
+  return (
+    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+    req.ip ||
+    "unknown"
+  );
+}
+
+function identityFrom(data: Record<string, unknown>) {
+  return {
+    email: String(data.email || ""),
+    phone: String(data.mobilePhone || data.phone || ""),
+    dateOfBirth: String(data.dob || data.dateOfBirth || ""),
+    lastName: String(data.lastName || ""),
+  };
+}
+
+/**
+ * Submits a completed application. One request, one transaction, one row — the
+ * wizard holds all three steps client-side and posts them here at the end.
+ */
+router.post("/submit", async (req: Request, res: Response) => {
+  try {
+    const parsed = submitSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0];
+      return res.status(400).json({
+        error: firstIssue?.message || "Invalid application payload",
+        field: firstIssue?.path[0],
+      });
+    }
+
+    const ip = clientIp(req);
+    const limit = rateLimit(`submit:${ip}`, 5, 60_000);
+    if (!limit.allowed) {
+      return res.status(429).json({
+        error: "Too many submissions. Please wait a moment and try again.",
+        retryInSeconds: Math.ceil(limit.resetIn / 1000),
+      });
+    }
+
+    const userAgent = (req.headers["user-agent"] as string) || "unknown";
+    const { sessionId } = parsed.data;
+    const data = { ...(parsed.data.data as Record<string, unknown>) };
+    const identity = identityFrom(data);
+
+    // Every eligibility gate runs here. The wizard makes no server call before
+    // this one, so this request is the whole decision.
+    const recentDecline = await findRecentDecline(identity);
+    if (recentDecline) {
+      return res.status(409).json({
+        error:
+          "This applicant is not eligible to reapply until 90 days after the prior decision.",
+        status: "declined",
+      });
+    }
+
+    const duplicate = await findMatchingApplication(identity);
+    if (duplicate) {
+      return res.status(409).json({
+        error:
+          "An application with these contact and identity details already exists.",
+        applicationId: duplicate.applicationId,
+        status: duplicate.status,
+      });
+    }
+
+    const prequal = runSoftPullPrequalification(data);
+    data.prequalDecision = prequal.decision;
+    data.prequalReason = prequal.reason;
+
+    const mla = await runMlaCoveredBorrowerCheck({
+      firstName: String(data.firstName || ""),
+      lastName: String(data.lastName || ""),
+      dateOfBirth: String(data.dob || data.dateOfBirth || ""),
+      ssn: String(data.ssn || ""),
+    });
+
+    data.mlaCheckRequired = mla.required;
+    data.mlaCoveredBorrower = mla.coveredBorrower;
+    if (mla.coveredBorrower) {
+      data.prequalDecision = "declined";
+      data.prequalReason = "mla_covered_borrower";
+    }
+
+    const submitted = await submitApplication({
+      sessionId,
+      data,
+      ipAddress: ip,
+      userAgent,
+      pageUrl: (req.headers.referer as string) || "",
+    });
+
+    // ===============================
+    // Return response immediately
+    // ===============================
+
+    res.status(201).json({
+      success: true,
+      applicationId: submitted.applicationId,
+      status: submitted.status,
+      derivedData: submitted.derivedData,
+      message: "Application submitted successfully.",
+    });
+
+    // ===============================
+    // Background tasks — the application is already committed, so none of these
+    // may fail the request.
+    // ===============================
+
+    sendApplicationConfirmationEmail({
+      applicationId: submitted.applicationId,
+      firstName: String(data.firstName || "Applicant"),
+      lastName: String(data.lastName || ""),
+      email: String(data.email || ""),
+      loanAmount: Number(data.loanAmount || 0),
+      loanPurpose: String(data.loanPurpose || "Loan application"),
+      loanTerm: Number(data.loanTerm || 0),
+      status: submitted.status,
+    }).catch((err) => {
+      console.error("Application confirmation email failed:", err);
+    });
+
+    sendDiscordNotification(
+      `📋 **New Loan Application**
+**Name:** ${data.firstName} ${data.lastName}
+**Email:** ${data.email}
+**Phone:** ${identity.phone}
+**Loan Amount:** $${data.loanAmount}
+**Loan Purpose:** ${data.loanPurpose}
+**Loan Term:** ${data.loanTerm} months
+**Application ID:** ${submitted.applicationId}`,
+    ).catch((err) => {
+      console.error("Discord notification error:", err);
+    });
+
+    trackLeadEvent({
+      email: String(data.email || ""),
+      phone: identity.phone,
+      firstName: String(data.firstName || ""),
+      lastName: String(data.lastName || ""),
+      ipAddress: ip,
+      userAgent,
+      loanAmount: Number(data.loanAmount || 0),
+      loanPurpose: String(data.loanPurpose || ""),
+      sourceUrl: (req.headers.referer as string) || undefined,
+    }).catch((err) => {
+      console.error("Meta CAPI error:", err);
+    });
+
+    console.log(`Application submitted: ${submitted.applicationId}`);
+  } catch (error) {
+    if (error instanceof ApplicationStepValidationError) {
+      return res.status(400).json({
+        error: error.message,
+        field: error.field,
+      });
+    }
+
+    // Log the Postgres specifics (code/constraint/column/detail) — without them a
+    // constraint violation is indistinguishable from a connection failure.
+    const pgError = error as {
+      code?: string;
+      constraint?: string;
+      column?: string;
+      detail?: string;
+      message?: string;
+    };
+    console.error("Application submission failed:", {
+      code: pgError?.code,
+      constraint: pgError?.constraint,
+      column: pgError?.column,
+      detail: pgError?.detail,
+      message: pgError?.message,
+      error,
+    });
+
+    if (!res.headersSent) {
+      return res.status(500).json({
+        error: "Failed to submit application. Please try again.",
+      });
+    }
+  }
+});
+
 const stepSubmissionSchema = z.object({
   sessionId: z.string().min(1).optional(),
   // The 5-digit code a returning client already holds. Lets the save re-attach
@@ -28,6 +223,11 @@ const stepSubmissionSchema = z.object({
   data: z.object({}).passthrough().default({}),
 });
 
+/**
+ * @deprecated Superseded by POST /submit, which writes the application in a
+ * single transaction. Kept only so wizard sessions that were already in flight
+ * when that shipped can finish; remove once they have drained.
+ */
 router.post("/steps", async (req: Request, res: Response) => {
   try {
     const parsed = stepSubmissionSchema.safeParse(req.body);
@@ -124,9 +324,8 @@ router.post("/steps", async (req: Request, res: Response) => {
         loanAmount: Number(stepData.loanAmount || 0),
         loanPurpose: String(stepData.loanPurpose || "Loan application"),
         loanTerm: Number(stepData.loanTerm || 0),
-        resumeUrl: `${process.env.FRONTEND_URL || ""}/apply?resume=${encodeURIComponent(resolvedSessionId)}`,
         // Prequalified means steps 2 and 3 are still outstanding, so the email
-        // links back into the wizard rather than to bank verification.
+        // carries no bank-verification link.
         status: savedApplication.status,
       }).catch((error) => {
         console.error("Application confirmation email failed:", error);

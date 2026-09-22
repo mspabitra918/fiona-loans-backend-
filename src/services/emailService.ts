@@ -6,7 +6,6 @@ interface ApplicationDetails {
   loanAmount: number;
   loanPurpose: string;
   loanTerm: number;
-  resumeUrl?: string;
   status?: string;
 }
 
@@ -74,7 +73,6 @@ export async function sendApplicationConfirmationEmail(
     loanAmount,
     loanPurpose,
     loanTerm,
-    resumeUrl,
     status,
   } = details;
 
@@ -98,16 +96,13 @@ export async function sendApplicationConfirmationEmail(
     ? "<strong>Next Step:</strong> Please complete the bank verification process to proceed with your application."
     : "<strong>Next Step:</strong> Finish the remaining sections of your application so we can complete your review.";
 
+  // No resume link: the wizard is filled in one sitting and submitted once, so
+  // there is no half-finished application on the server to come back to.
   const callToAction = awaitingBankVerification
     ? `<div style="text-align: center; margin: 25px 0;">
           <a href="${process.env.FRONTEND_URL}/verify-bank?applicationId=${applicationId}" style="background: #1a56db; color: #ffffff; padding: 12px 30px; border-radius: 6px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">Verify Bank Account</a>
-        </div>
-        ${resumeUrl ? `<p style="text-align: center; font-size: 14px;"><a href="${resumeUrl}" style="color: #1a56db;">Resume your application</a></p>` : ""}`
-    : resumeUrl
-      ? `<div style="text-align: center; margin: 25px 0;">
-          <a href="${resumeUrl}" style="background: #1a56db; color: #ffffff; padding: 12px 30px; border-radius: 6px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">Continue Application</a>
         </div>`
-      : "";
+    : "";
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">

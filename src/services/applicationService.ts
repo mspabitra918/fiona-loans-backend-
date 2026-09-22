@@ -651,6 +651,514 @@ export async function runMlaCoveredBorrowerCheck(
   return { required: true, coveredBorrower: result.coveredBorrower };
 }
 
+/**
+ * Every column value the writes below need, derived from one merged wizard
+ * payload. Shared by the single-transaction submit and the deprecated per-step
+ * save so the two can never normalize the same field differently.
+ */
+interface ApplicationColumnValues {
+  baseValues: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+    date_of_birth: string | null;
+    street_address: string;
+    city: string;
+    state: string;
+    zip_code: string;
+    loan_amount: number;
+    loan_purpose: string;
+    loan_purpose_other_detail: string;
+    loan_term: number | null;
+    time_at_current_address: string;
+    housing_status: string;
+    employment_status: string;
+    primary_income_type: string;
+    net_monthly_income: number | null;
+    pay_frequency: string;
+    direct_deposit: boolean;
+    additional_monthly_income: number | null;
+    additional_income_source: string;
+    ip_address: string;
+    user_agent: string;
+  };
+  encryptedSsn: string | null;
+  encryptedDlNumber: string | null;
+  encryptedAccountNumber: string | null;
+  encryptedRoutingNumber: string | null;
+  ssnHash: string | null;
+  plaidDetails: Record<string, unknown>;
+  accountAge: string | null;
+  bankBalanceStatus: string | null;
+  accountType: string | null;
+  timeAtCurrentJob: string | null;
+  nextPayDate: string | null;
+}
+
+function buildApplicationColumnValues(
+  mergedData: Record<string, unknown>,
+  context: { ipAddress: string; userAgent: string },
+): ApplicationColumnValues {
+  const loanTerm = Number(mergedData.loanTerm ?? 0);
+
+  const baseValues = {
+    first_name: clip(mergedData.firstName, 40),
+
+    last_name: clip(mergedData.lastName, 40),
+
+    email: clip(mergedData.email, 255),
+
+    phone: clip(mergedData.mobilePhone || mergedData.phone, 20),
+
+    date_of_birth: toDateOnly(mergedData.dob),
+
+    street_address: clip(mergedData.streetAddress, 100),
+
+    city: clip(mergedData.city, 50),
+
+    state: clip(mergedData.state, 5),
+
+    zip_code: clip(mergedData.zipCode, 5),
+
+    loan_amount: toAmount(mergedData.loanAmount),
+
+    loan_purpose: clip(mergedData.loanPurpose, 50),
+
+    // IMPORTANT
+    loan_purpose_other_detail: clip(
+      mergedData.purposeOtherDetail || mergedData.loan_purpose_other_detail,
+      120,
+    ),
+
+    // Nullable column with a CHECK — an unsupported term is dropped rather than
+    // taking the whole save down with it.
+    loan_term: LOAN_TERMS.includes(loanTerm) ? loanTerm : null,
+
+    time_at_current_address: normalizeEnum(
+      mergedData.timeAtAddress,
+      ENUM_DOMAINS.timeAtAddress,
+      "under_6_months",
+    ) as string,
+
+    housing_status: normalizeEnum(
+      mergedData.housingStatus,
+      ENUM_DOMAINS.housingStatus,
+      "other",
+    ) as string,
+
+    employment_status: normalizeEnum(
+      mergedData.employmentStatus,
+      ENUM_DOMAINS.employmentStatus,
+      "not_currently_employed",
+    ) as string,
+
+    primary_income_type: normalizeEnum(
+      mergedData.primaryIncomeType,
+      ENUM_DOMAINS.primaryIncomeType,
+      "other",
+    ) as string,
+
+    // Null means "leave whatever is already stored" — passing 0 for a step that
+    // simply does not carry income would wipe the step-1 value and trip its CHECK.
+    net_monthly_income: hasValue(mergedData.netMonthlyIncome)
+      ? toAmount(mergedData.netMonthlyIncome)
+      : null,
+
+    pay_frequency: normalizeEnum(
+      mergedData.payFrequency,
+      ENUM_DOMAINS.payFrequency,
+      "irregular",
+    ) as string,
+
+    direct_deposit: [true, "Yes", "yes", "true"].includes(
+      mergedData.directDeposit as never,
+    ),
+
+    additional_monthly_income: hasValue(mergedData.additionalMonthlyIncome)
+      ? toAmount(mergedData.additionalMonthlyIncome)
+      : null,
+
+    additional_income_source: clip(mergedData.additionalIncomeSource, 50),
+
+    ip_address: clip(context.ipAddress, 45) || "unknown",
+
+    user_agent: context.userAgent,
+  };
+
+  const { ssn, dlNumber, accountNumber, routingNumber } = mergedData;
+
+  return {
+    baseValues,
+
+    encryptedSsn: ssn ? encrypt(String(ssn)) : null,
+
+    encryptedDlNumber: dlNumber ? encrypt(String(dlNumber)) : null,
+
+    encryptedAccountNumber: accountNumber ? encrypt(String(accountNumber)) : null,
+
+    encryptedRoutingNumber: routingNumber ? encrypt(String(routingNumber)) : null,
+
+    ssnHash: ssn ? hashSSN(String(ssn).replace(/\D/g, "")) : null,
+
+    plaidDetails: (mergedData.plaidDetails || {}) as Record<string, unknown>,
+
+    // Frontend sends values such as under_6_months / 1_year / 5_plus_years.
+    accountAge: normalizeEnum(mergedData.accountAge, ENUM_DOMAINS.bankAccountAge),
+
+    bankBalanceStatus: normalizeEnum(
+      mergedData.accountStatus,
+      ENUM_DOMAINS.bankBalanceStatus,
+    ),
+
+    accountType: normalizeEnum(mergedData.accountType, ENUM_DOMAINS.accountType),
+
+    // The column's CHECK domain is NOT the same as time_at_current_address: it
+    // has `under_3_months` + `3_5_months` where the address list has
+    // `under_6_months`. Older drafts still hold the address value, so
+    // normalizing to null here keeps the save alive instead of failing on the
+    // constraint.
+    timeAtCurrentJob: normalizeEnum(
+      mergedData.timeAtJob || mergedData.time_at_current_job,
+      ENUM_DOMAINS.timeAtJob,
+    ),
+
+    nextPayDate: toDateOnly(mergedData.nextPayDate),
+  };
+}
+
+export interface SubmitApplicationInput {
+  /**
+   * The wizard's client-side id. Carried for traceability only — nothing is
+   * looked up by it, because the row is created once, here, at the end.
+   */
+  sessionId?: string;
+  data: Record<string, unknown>;
+  ipAddress: string;
+  userAgent: string;
+  pageUrl?: string;
+  referrerUrl?: string;
+}
+
+/**
+ * Funnel timestamps the wizard collected client-side. Previously these columns
+ * were filled by whichever step save happened to be running; with a single
+ * write the client is the only thing that still knows when each step finished.
+ * Anything unparseable, in the future, or older than a day is discarded in
+ * favour of the submit time rather than being written as-is.
+ */
+function resolveStepTimestamp(raw: unknown, submittedAt: Date): string {
+  const parsed = new Date(String(raw ?? ""));
+  if (Number.isNaN(parsed.getTime())) return submittedAt.toISOString();
+
+  const ageMs = submittedAt.getTime() - parsed.getTime();
+  if (ageMs < 0 || ageMs > 24 * 60 * 60 * 1000) return submittedAt.toISOString();
+
+  return parsed.toISOString();
+}
+
+/**
+ * Writes a completed application in a single transaction.
+ *
+ * The wizard collects all three steps client-side and posts them once, so there
+ * is no existing row to find, no JSON merge, and no partial state to reconcile —
+ * the application either exists in full or not at all. Callers must have run the
+ * eligibility gates (decline, duplicate, prequal, MLA) beforehand and folded
+ * their outcome into `data`.
+ */
+export async function submitApplication(input: SubmitApplicationInput): Promise<{
+  id: string;
+  applicationId: string;
+  status: string;
+  derivedData: DerivedApplicationFields;
+}> {
+  const data = input.data ?? {};
+
+  // Range-check before touching the database: a CHECK violation surfacing from
+  // Postgres would abort the whole submission with an opaque 500.
+  assertPersistableRanges(data, true);
+
+  const derivedData = calculateDerivedApplicationFields(data);
+  const values = buildApplicationColumnValues(data, {
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+  });
+
+  const status =
+    data.prequalDecision === "declined" || data.mlaCoveredBorrower === true
+      ? "declined"
+      : data.bankAuthMode === "instant"
+        ? "bank_verification_completed"
+        : "bank_verification_pending";
+
+  const {
+    ssn,
+    confirmSsn,
+    dlNumber,
+    accountNumber,
+    confirmAccountNumber,
+    routingNumber,
+    ...safeData
+  } = data;
+
+  const submittedAt = new Date();
+  const step1StartedAt = resolveStepTimestamp(data.step1StartedAt, submittedAt);
+  const step1SubmittedAt = resolveStepTimestamp(
+    data.step1SubmittedAt,
+    submittedAt,
+  );
+  const step2SubmittedAt = resolveStepTimestamp(
+    data.step2SubmittedAt,
+    submittedAt,
+  );
+  const step3SubmittedAt = submittedAt.toISOString();
+
+  const totalTimeOnForm = Math.max(
+    0,
+    Math.round(
+      (submittedAt.getTime() - new Date(step1StartedAt).getTime()) / 1000,
+    ),
+  );
+
+  const applicationData = {
+    ...safeData,
+    derivedData,
+    sessionId: input.sessionId || "",
+    clientIp: input.ipAddress,
+    userAgent: input.userAgent,
+    pageUrl: input.pageUrl || data.pageUrl || "",
+    referrerUrl: input.referrerUrl || data.referrerUrl || "",
+    step1StartedAt,
+    step1SubmittedAt,
+    step2SubmittedAt,
+    step3SubmittedAt,
+  };
+
+  const id = randomUUID();
+
+  // generateUniqueId checks-then-inserts, so two concurrent submissions can pick
+  // the same 5-digit code. The insert below retries on the unique violation.
+  let applicationId = await generateUniqueId(
+    "loan_applications",
+    "application_id",
+  );
+
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await transaction(async (tx) => {
+        await tx.query(
+          `INSERT INTO loan_applications (
+            id,
+            application_id,
+            session_id,
+            application_data,
+            step_number,
+            current_step,
+
+            page_url,
+            referrer_url,
+
+            step1_started_at,
+            step1_submitted_at,
+            step2_submitted_at,
+            step3_submitted_at,
+            total_time_on_form,
+
+            loan_amount,
+            loan_purpose,
+            loan_purpose_other_detail,
+            loan_term,
+
+            first_name,
+            middle_initial,
+            last_name,
+            suffix,
+            email,
+            phone,
+            date_of_birth,
+
+            street_address,
+            apt_unit_suite,
+            city,
+            state,
+            zip_code,
+            time_at_current_address,
+            housing_status,
+            monthly_housing_payment,
+
+            employment_status,
+            primary_income_type,
+            employer_name,
+            job_title,
+            employer_phone,
+            time_at_current_job,
+            net_monthly_income,
+            pay_frequency,
+            next_pay_date,
+            direct_deposit,
+            additional_monthly_income,
+            additional_income_source,
+
+            ssn_encrypted,
+            ssn_hash,
+            dl_number_encrypted,
+            dl_state,
+            dl_expiration_date,
+
+            bank_name,
+            plaid_item_id,
+            plaid_account_id,
+            plaid_account_mask,
+            plaid_account_type,
+            account_number_encrypted,
+            routing_number_encrypted,
+            bank_account_age,
+            bank_balance_status,
+            account_type,
+            bank_verification_completed,
+
+            tcpa_consent,
+            esign_consent,
+            privacy_consent,
+            soft_credit_pull_consent,
+            hard_credit_pull_consent,
+            ach_authorization_consent,
+
+            ip_address,
+            user_agent,
+            status,
+            created_at,
+            updated_at
+          ) VALUES (
+            $1, $2, $3, $4::jsonb, 3, 'step3',
+            $5, $6,
+            $7::timestamptz, $8::timestamptz, $9::timestamptz, $10::timestamptz, $11,
+            $12, $13, NULLIF($14, ''), $15,
+            $16, NULLIF($17, ''), $18, NULLIF($19, ''), $20, $21, $22::date,
+            $23, NULLIF($24, ''), $25, $26, $27, $28, $29, COALESCE($30::numeric, 0),
+            $31, $32, NULLIF($33, ''), NULLIF($34, ''), NULLIF($35, ''), $36,
+            $37, $38, $39::date, $40, COALESCE($41::numeric, 0), NULLIF($42, ''),
+            $43, $44, $45, NULLIF($46, ''), $47::date,
+            NULLIF($48, ''), NULLIF($49, ''), NULLIF($50, ''), NULLIF($51, ''), NULLIF($52, ''),
+            $53, $54, $55, $56, $57, $58,
+            $59, $60, $61, $62, $63, $64,
+            $65, $66, $67, NOW(), NOW()
+          )`,
+          [
+            id, // $1
+            applicationId, // $2
+            input.sessionId || null, // $3
+            JSON.stringify(applicationData), // $4
+
+            input.pageUrl || "", // $5
+            input.referrerUrl || "", // $6
+
+            step1StartedAt, // $7
+            step1SubmittedAt, // $8
+            step2SubmittedAt, // $9
+            step3SubmittedAt, // $10
+            totalTimeOnForm, // $11
+
+            values.baseValues.loan_amount, // $12
+            values.baseValues.loan_purpose, // $13
+            values.baseValues.loan_purpose_other_detail, // $14
+            values.baseValues.loan_term, // $15
+
+            values.baseValues.first_name, // $16
+            clip(data.middleInitial, 1), // $17
+            values.baseValues.last_name, // $18
+            normalizeEnum(data.suffix, ENUM_DOMAINS.suffix) ?? "", // $19
+            values.baseValues.email, // $20
+            values.baseValues.phone, // $21
+            values.baseValues.date_of_birth, // $22
+
+            values.baseValues.street_address, // $23
+            clip(data.aptUnit, 20), // $24
+            values.baseValues.city, // $25
+            values.baseValues.state, // $26
+            values.baseValues.zip_code, // $27
+            values.baseValues.time_at_current_address, // $28
+            values.baseValues.housing_status, // $29
+            hasValue(data.monthlyHousingPayment)
+              ? toAmount(data.monthlyHousingPayment)
+              : null, // $30
+
+            values.baseValues.employment_status, // $31
+            values.baseValues.primary_income_type, // $32
+            clip(data.employerName, 60), // $33
+            clip(data.jobTitle, 50), // $34
+            clip(data.employerPhone, 20), // $35
+            values.timeAtCurrentJob, // $36
+            values.baseValues.net_monthly_income, // $37
+            values.baseValues.pay_frequency, // $38
+            values.nextPayDate, // $39
+            values.baseValues.direct_deposit, // $40
+            values.baseValues.additional_monthly_income, // $41
+            values.baseValues.additional_income_source, // $42
+
+            values.encryptedSsn, // $43
+            values.ssnHash, // $44
+            values.encryptedDlNumber, // $45
+            clip(data.dlState, 5), // $46
+            toDateOnly(data.dlExpiration), // $47
+
+            clip(data.bankName, 100), // $48
+            clip(values.plaidDetails.itemId, 255), // $49
+            clip(values.plaidDetails.accountId, 255), // $50
+            clip(values.plaidDetails.accountMask, 4), // $51
+            clip(values.plaidDetails.accountType, 30), // $52
+            values.encryptedAccountNumber, // $53
+            values.encryptedRoutingNumber, // $54
+            values.accountAge, // $55
+            values.bankBalanceStatus, // $56
+            values.accountType, // $57
+            data.bankAuthMode === "instant", // $58
+
+            Boolean(data.tcpaConsent), // $59
+            Boolean(data.esignConsent), // $60
+            Boolean(data.privacyConsent), // $61
+            Boolean(data.softCreditConsent), // $62
+            Boolean(data.hardCreditConsent), // $63
+            Boolean(data.achConsent), // $64
+
+            values.baseValues.ip_address, // $65
+            values.baseValues.user_agent, // $66
+            status, // $67
+          ],
+        );
+      });
+      break;
+    } catch (error) {
+      const isIdCollision =
+        (error as { code?: string })?.code === "23505" &&
+        (error as { constraint?: string })?.constraint ===
+          "loan_applications_application_id_key";
+
+      if (!isIdCollision || attempt >= 4) throw error;
+
+      applicationId = await generateUniqueId(
+        "loan_applications",
+        "application_id",
+      );
+    }
+  }
+
+  // Only a manually-entered account still owes us a verification, so only that
+  // status starts the chase sequence. Never throws — drip bookkeeping must not
+  // fail a submission that is already committed.
+  if (status === "bank_verification_pending") {
+    await enqueueDripSequence(id, new Date());
+  }
+
+  return { id, applicationId, status, derivedData };
+}
+
+/**
+ * @deprecated The wizard now collects all three steps client-side and posts
+ * once to `submitApplication`, which writes the application in a single
+ * transaction. This per-step upsert stays only so sessions that were already
+ * in flight when that shipped can finish; remove it once they have drained.
+ */
 export async function saveApplicationStep(
   input: SaveApplicationStepInput,
 ): Promise<{
@@ -785,176 +1293,30 @@ export async function saveApplicationStep(
   };
 
   // ============================================================
-  // 8. BASE VALUES
+  // 8. COLUMN VALUES
   // ============================================================
 
   assertPersistableRanges(mergedData, !existing);
 
-  const loanTerm = Number(mergedData.loanTerm ?? 0);
-
-  const baseValues = {
-    first_name: clip(mergedData.firstName, 40),
-
-    last_name: clip(mergedData.lastName, 40),
-
-    email: clip(mergedData.email, 255),
-
-    phone: clip(mergedData.mobilePhone || mergedData.phone, 20),
-
-    date_of_birth: toDateOnly(mergedData.dob),
-
-    street_address: clip(mergedData.streetAddress, 100),
-
-    city: clip(mergedData.city, 50),
-
-    state: clip(mergedData.state, 5),
-
-    zip_code: clip(mergedData.zipCode, 5),
-
-    loan_amount: toAmount(mergedData.loanAmount),
-
-    loan_purpose: clip(mergedData.loanPurpose, 50),
-
-    // IMPORTANT
-    loan_purpose_other_detail: clip(
-      mergedData.purposeOtherDetail || mergedData.loan_purpose_other_detail,
-      120,
-    ),
-
-    // Nullable column with a CHECK — an unsupported term is dropped rather than
-    // taking the whole save down with it.
-    loan_term: LOAN_TERMS.includes(loanTerm) ? loanTerm : null,
-
-    time_at_current_address: normalizeEnum(
-      mergedData.timeAtAddress,
-      ENUM_DOMAINS.timeAtAddress,
-      "under_6_months",
-    ) as string,
-
-    housing_status: normalizeEnum(
-      mergedData.housingStatus,
-      ENUM_DOMAINS.housingStatus,
-      "other",
-    ) as string,
-
-    employment_status: normalizeEnum(
-      mergedData.employmentStatus,
-      ENUM_DOMAINS.employmentStatus,
-      "not_currently_employed",
-    ) as string,
-
-    primary_income_type: normalizeEnum(
-      mergedData.primaryIncomeType,
-      ENUM_DOMAINS.primaryIncomeType,
-      "other",
-    ) as string,
-
-    // Null means "leave whatever is already stored" — passing 0 for a step that
-    // simply does not carry income would wipe the step-1 value and trip its CHECK.
-    net_monthly_income: hasValue(mergedData.netMonthlyIncome)
-      ? toAmount(mergedData.netMonthlyIncome)
-      : null,
-
-    pay_frequency: normalizeEnum(
-      mergedData.payFrequency,
-      ENUM_DOMAINS.payFrequency,
-      "irregular",
-    ) as string,
-
-    direct_deposit: [true, "Yes", "yes", "true"].includes(
-      mergedData.directDeposit as never,
-    ),
-
-    additional_monthly_income: hasValue(mergedData.additionalMonthlyIncome)
-      ? toAmount(mergedData.additionalMonthlyIncome)
-      : null,
-
-    additional_income_source: clip(mergedData.additionalIncomeSource, 50),
-
-    ip_address: clip(input.ipAddress, 45) || "unknown",
-
-    user_agent: input.userAgent,
-  };
-
-  // ============================================================
-  // 9. ENCRYPT SENSITIVE VALUES
-  // ============================================================
-
-  const encryptedSsn = ssn ? encrypt(String(ssn)) : null;
-
-  const encryptedDlNumber = dlNumber ? encrypt(String(dlNumber)) : null;
-
-  const encryptedAccountNumber = accountNumber
-    ? encrypt(String(accountNumber))
-    : null;
-
-  const encryptedRoutingNumber = routingNumber
-    ? encrypt(String(routingNumber))
-    : null;
-
-  const ssnHash = ssn ? hashSSN(String(ssn).replace(/\D/g, "")) : null;
-
-  // ============================================================
-  // 10. PLAID DETAILS
-  // ============================================================
-
-  const plaidDetails = (mergedData.plaidDetails || {}) as Record<
-    string,
-    unknown
-  >;
-
-  // ============================================================
-  // 11. ACCOUNT AGE
-  // Frontend sends values such as:
-  // under_6_months
-  // 1_year
-  // 2_years
-  // 3_years
-  // 4_years
-  // 5_plus_years
-  // ============================================================
-
-  const accountAge = normalizeEnum(
-    mergedData.accountAge,
-    ENUM_DOMAINS.bankAccountAge,
-  );
-
-  // ============================================================
-  // 12. BANK BALANCE STATUS
-  // ============================================================
-
-  const bankBalanceStatus = normalizeEnum(
-    mergedData.accountStatus,
-    ENUM_DOMAINS.bankBalanceStatus,
-  );
-
-  // ============================================================
-  // 13. ACCOUNT TYPE
-  // ============================================================
-
-  const accountType = normalizeEnum(
-    mergedData.accountType,
-    ENUM_DOMAINS.accountType,
-  );
-
-  // ============================================================
-  // 14. TIME AT CURRENT JOB
-  // The column's CHECK domain is NOT the same as time_at_current_address: it has
-  // `under_3_months` + `3_5_months` where the address list has `under_6_months`.
-  // Older drafts still hold the address value, so normalizing to null here keeps
-  // the save alive instead of failing on the constraint.
-  // ============================================================
-
-  const timeAtCurrentJob = normalizeEnum(
-    mergedData.timeAtJob || mergedData.time_at_current_job,
-    ENUM_DOMAINS.timeAtJob,
-  );
-
-  // ============================================================
-  // 15. NEXT PAY DATE
-  // ============================================================
-
-  const nextPayDate = toDateOnly(mergedData.nextPayDate);
+  // Shared with submitApplication so the two write paths can never normalize
+  // the same field differently.
+  const {
+    baseValues,
+    encryptedSsn,
+    encryptedDlNumber,
+    encryptedAccountNumber,
+    encryptedRoutingNumber,
+    ssnHash,
+    plaidDetails,
+    accountAge,
+    bankBalanceStatus,
+    accountType,
+    timeAtCurrentJob,
+    nextPayDate,
+  } = buildApplicationColumnValues(mergedData, {
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+  });
 
   // ============================================================
   // 16. UPDATE EXISTING APPLICATION
