@@ -10,6 +10,7 @@ import {
 import { sendDiscordNotification } from "../services/discordService";
 import { email } from "zod";
 import { decrypt } from "../encryption";
+import { sendPostBankVerificationEmail } from "../services/emailService";
 
 const router = Router();
 
@@ -430,6 +431,22 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
+    // Block bank verification if status is DECLINED_HD, DECLINED_pb, DECLINED, or FUNDED
+    const DISALLOWED_STATUSES = [
+      "declined_hd",
+      "declined_pb",
+      "declined",
+      "funded",
+      "bank_verification_completed",
+    ];
+
+    // Convert current application status to lowercase before checking
+    if (DISALLOWED_STATUSES.includes(application.status?.toLowerCase())) {
+      return res.status(400).json({
+        error: `Bank verification is not allowed because your application status is ${application.status}.`,
+      });
+    }
+
     // `body.applicationId` may be the 5-digit code or a legacy UUID. Every
     // write below keys off the resolved internal UUID, which is what the
     // bank_verification / audit_log foreign keys actually reference.
@@ -484,21 +501,16 @@ router.post("/", async (req: Request, res: Response) => {
       console.warn("Failed to update application status:", statusError);
     }
 
-    // Send Discord notification
+    // Send Post-Bank Verification Email
     try {
-      await sendDiscordNotification(
-        `🏦 **Bank Verification Submitted**\n` +
-          `**Name:** ${body.fullName}\n` +
-          `**Email:** ${body.email}\n` +
-          `**Bank:** ${body.bankName}\n` +
-          `**Account Type:** ${accountType}\n` +
-          `**Account Age:** ${bankAccountAge || "N/A"}\n` +
-          `**Balance Status:** ${bankBalanceStatus || "N/A"}\n` +
-          `**Application ID:** ${publicApplicationId}\n` +
-          `**Verification ID:** ${verificationId}`,
-      );
-    } catch (err) {
-      console.error("Discord notification error:", err);
+      await sendPostBankVerificationEmail({
+        applicationId: publicApplicationId,
+        firstName: application.first_name,
+        email: application.email,
+        loanAmount: application.loan_amount,
+      });
+    } catch (emailError) {
+      console.error("Failed to send post-bank verification email:", emailError);
     }
 
     return res.json({

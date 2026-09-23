@@ -3,6 +3,7 @@ import "dotenv/config";
 import { Worker, type Job } from "bullmq";
 import { getRedisConnection } from "./queue/connection";
 import {
+  DRIP_EXPIRY_STATUS,
   DRIP_QUEUE_NAME,
   DRIP_TRACK_STATUS,
   isTrackAllowedInStatus,
@@ -12,13 +13,14 @@ import type { DripJobData } from "./queue/dripQueue";
 import {
   getApplicationById,
   purgeExpiredSensitiveData,
+  updateApplicationStatus,
 } from "./services/applicationService";
-import { sendDripEmail } from "./services/dripEmailService";
+import { sendNewDripEmail } from "./services/newDripEmailService";
 import { recordDripSent, hasDripBeenSent } from "./services/dripLogService";
 import { queryOne } from "./db";
 
 /**
- * Always-on BullMQ worker for the drip sequences (verification + call tracks).
+ * Always-on BullMQ worker for the bank-verification drip sequence.
  *
  * Deploy this as a separate long-running process (e.g. on the Hostinger VPS):
  *   npm run build && npm run worker
@@ -30,6 +32,9 @@ import { queryOne } from "./db";
  *     to send unless it still matches the status its track is gated on.
  *   - Idempotency: `drip_email_log` has a UNIQUE (application_id, email_number)
  *     constraint, so a retried job can never double-send.
+ *
+ * The last step of the sequence (T+72h) is also the point of no return: after
+ * its cancellation notice goes out the application is moved to `declined`.
  */
 async function processDripJob(job: Job<DripJobData>): Promise<void> {
   const { applicationId, emailNumber } = job.data;
@@ -67,8 +72,8 @@ async function processDripJob(job: Job<DripJobData>): Promise<void> {
   }
 
   // KILL-SWITCH: only send while the application is still in the status its
-  // track is gated on. Both tracks are gated on `bank_verification_pending`, so
-  // a file that has moved on (e.g. `bank_verification_completed`) sends nothing.
+  // track is gated on — `bank_verification_pending` — so a file that has moved
+  // on (e.g. `bank_verification_completed`) sends nothing.
   if (!isTrackAllowedInStatus(step.track, application.status)) {
     console.log(
       `[drip] application ${applicationId} is now "${application.status}" (${step.track} track needs "${DRIP_TRACK_STATUS[step.track]}") — skipping email ${emailNumber}`,
@@ -84,7 +89,7 @@ async function processDripJob(job: Job<DripJobData>): Promise<void> {
     return;
   }
 
-  await sendDripEmail(emailNumber, {
+  await sendNewDripEmail(step.templateNumber, {
     applicationId: application.application_id,
     firstName: application.first_name,
     email: application.email,
@@ -95,6 +100,29 @@ async function processDripJob(job: Job<DripJobData>): Promise<void> {
   console.log(
     `[drip] sent email ${emailNumber} to ${application.email} (application ${applicationId})`,
   );
+
+  // End of the sequence: the borrower never verified inside the 72h window, so
+  // the cancellation notice they just received is made true on the file. The
+  // status change itself drops any remaining drip jobs.
+  if (step.declinesApplication) {
+    try {
+      await updateApplicationStatus(
+        applicationId,
+        DRIP_EXPIRY_STATUS,
+        "system:drip",
+      );
+      console.log(
+        `[drip] application ${applicationId} moved to "${DRIP_EXPIRY_STATUS}" after the 72h verification window closed`,
+      );
+    } catch (error) {
+      // The email is already out; a failed status write must not retry the job
+      // and re-send it. Surface it and let the next sweep or an admin fix it.
+      console.error(
+        `[drip] failed to move application ${applicationId} to "${DRIP_EXPIRY_STATUS}":`,
+        error,
+      );
+    }
+  }
 }
 
 const worker = new Worker<DripJobData>(DRIP_QUEUE_NAME, processDripJob, {

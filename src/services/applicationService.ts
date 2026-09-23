@@ -9,10 +9,10 @@ import { randomUUID } from "node:crypto";
 import { validate as isUuid } from "uuid";
 
 /**
- * Cancels the drip tracks a new status locks out. Both the verify and call
- * tracks are gated on `bank_verification_pending`, so any other status — most
- * commonly `bank_verification_completed` — drops both. Never throws: drip
- * bookkeeping must not fail a status update.
+ * Cancels the drip tracks a new status locks out. The verify track is gated on
+ * `bank_verification_pending`, so any other status — most commonly
+ * `bank_verification_completed` — drops it. Never throws: drip bookkeeping must
+ * not fail a status update.
  */
 async function syncDripTracksForStatus(
   id: string,
@@ -2035,7 +2035,7 @@ export async function saveApplicationStep(
   const isFinalStep = input.step === FINAL_APPLICATION_STEP;
 
   if (resolvedStatus === "bank_verification_completed") {
-    await cancelDripSequence(id, ["verify", "call"]);
+    await cancelDripSequence(id);
   } else if (isFinalStep && resolvedStatus === "bank_verification_pending") {
     await enqueueDripSequence(id, new Date());
   }

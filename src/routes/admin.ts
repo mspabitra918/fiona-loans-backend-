@@ -654,6 +654,7 @@ router.patch(
               email: application.email,
               loanAmount: application.loan_amount,
               status,
+              fundedAt: application.funded_at || "",
             });
           }
         } catch (emailError) {
