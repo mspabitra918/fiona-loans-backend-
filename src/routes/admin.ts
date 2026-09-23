@@ -329,7 +329,7 @@ router.get(
       const response = {
         ...publicApplication,
         routing_number_encrypted: decrypt(application.routing_number_encrypted),
-        date_of_birth: formatDate(application.date_of_birth),
+        date_of_birth: application.date_of_birth,
         created_at: application.created_at,
         updated_at: application.updated_at,
         reviewed_at: application.reviewed_at,
