@@ -381,11 +381,34 @@ const statusConfig: Record<
     message: "",
     customBody: (details) => `
       <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
-      <p style="color: #374151; font-size: 16px;">We have reviewed your application, but unfortunately, it has been declined at this time.</p>
-      <p style="color: #374151; font-size: 16px;"><strong>Reason for decline:</strong> The bank account you provided on file belongs to an online-only or prepaid bank.</p>
-      <p style="color: #374151; font-size: 16px;">To secure a personal loan with Fiona Loans, you must have an active checking account with a regular, traditional, or local brick-and-mortar bank.</p>
-      <p style="color: #374151; font-size: 16px;"><strong>How to fix this:</strong> If you have an account with a traditional bank, your application can still be salvaged! Please call us immediately at <a href="tel:+17472005930" style="color: #1a56db; text-decoration: none;">(747) 200-5930</a> to update your file with your new bank account information.</p>
-      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best regards,<br/>The Underwriting Team at Fiona Loans</p>
+      <p style="color: #374151; font-size: 16px;">Thank you for submitting your loan application.</p>
+      
+      <p style="color: #374151; font-size: 16px;">
+        After reviewing the banking information provided, we’re unable to proceed with your application at this time because the account provided is with a prepaid banking service and does not meet the current bank-account eligibility requirements for this application.
+      </p>
+
+      <p style="color: #374151; font-size: 16px;">
+        To be eligible to proceed, you must have an active local bank account that has been open for at least 90 days.
+      </p>
+
+      <p style="color: #374151; font-size: 16px;">
+        <strong>Application ID:</strong> ${details.applicationId}<br/>
+        <strong>Loan Amount:</strong> $${details.loanAmount}
+      </p>
+
+      <p style="color: #374151; font-size: 16px;">
+        If you have an eligible local bank account that meets this requirement, please contact us to discuss the next steps:
+      </p>
+
+      <p style="color: #374151; font-size: 16px;">
+        Phone: <a href="tel:+17472005930" style="color: #1a56db; text-decoration: none;">(747) 200-5930</a><br/>
+        Email: <a href="mailto:support@fionaloans.com" style="color: #1a56db; text-decoration: none;">support@fionaloans.com</a>
+      </p>
+
+      <p style="color: #374151; font-size: 16px; margin-top: 24px;">
+        Thank you,<br/>
+        Fiona Loans Support
+      </p>
     `,
     color: "#dc2626",
     icon: "&#9888;",
@@ -395,12 +418,36 @@ const statusConfig: Record<
     subject: "Notice of Action: Your loan application status",
     message: "",
     customBody: (details) => `
-      <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
-      <p style="color: #374151; font-size: 16px;">Thank you for applying for a personal loan with Fiona Loans. We have completed a review of your application and financial profile.</p>
-      <p style="color: #374151; font-size: 16px;">We regret to inform you that we are unable to approve your application at this time. Our internal processor was unable to accept your file due to an unstable repayment history and a high Debt-to-Income (DTI) ratio.</p>
-      <p style="color: #374151; font-size: 16px;">We appreciate your interest in Fiona Loans and wish you the best in your financial journey.</p>
-      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Sincerely,<br/>The Underwriting Team at Fiona Loans</p>
-    `,
+    <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
+    <p style="color: #374151; font-size: 16px;">Thank you for submitting your loan application.</p>
+    
+    <p style="color: #374151; font-size: 16px;">
+      After completing the underwriting review, the lender has determined that your application does not meet its current credit and risk assessment criteria. As a result, we are unable to approve the application at this time.
+    </p>
+
+    <p style="color: #374151; font-size: 16px;">
+      <strong>Application ID:</strong> ${details.applicationId}<br/>
+      <strong>Requested Loan Amount:</strong> $${details.loanAmount}
+    </p>
+
+    <p style="color: #374151; font-size: 16px;">
+      This decision is based on the lender’s assessment of the application and its applicable underwriting requirements.
+    </p>
+
+    <p style="color: #374151; font-size: 16px;">
+      If you have questions regarding your application or the decision, please contact our support team:
+    </p>
+
+    <p style="color: #374151; font-size: 16px;">
+      Phone: <a href="tel:+17472005930" style="color: #1a56db; text-decoration: none;">(747) 200-5930</a><br/>
+      Email: <a href="mailto:support@fionaloans.com" style="color: #1a56db; text-decoration: none;">support@fionaloans.com</a>
+    </p>
+
+    <p style="color: #374151; font-size: 16px; margin-top: 24px;">
+      Thank you,<br/>
+      Fiona Loans Support
+    </p>
+  `,
     color: "#dc2626",
     icon: "&#10060;",
   },
