@@ -44,12 +44,10 @@ router.post("/", async (req: Request, res: Response) => {
     };
 
     try {
-      const id = await generateUniqueId("contact_messages");
       await query(
-        `INSERT INTO contact_messages (id, name, email, subject, message, ip_address)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO contact_messages (name, email, subject, message, ip_address)
+     VALUES ($1, $2, $3, $4, $5)`,
         [
-          id,
           sanitizedData.name,
           sanitizedData.email,
           sanitizedData.subject,
@@ -58,18 +56,17 @@ router.post("/", async (req: Request, res: Response) => {
         ],
       );
     } catch (dbError) {
-      console.warn("Contact message DB insert failed:", dbError);
-      console.log("Contact form submission:", sanitizedData);
+      console.error("Contact message DB insert failed:", dbError);
     }
 
     // Send Discord notification
     try {
       await sendDiscordNotification(
         `✉️ **New Contact Message**\n` +
-        `**Name:** ${sanitizedData.name}\n` +
-        `**Email:** ${sanitizedData.email}\n` +
-        `**Subject:** ${sanitizedData.subject}\n` +
-        `**Message:** ${sanitizedData.message}`
+          `**Name:** ${sanitizedData.name}\n` +
+          `**Email:** ${sanitizedData.email}\n` +
+          `**Subject:** ${sanitizedData.subject}\n` +
+          `**Message:** ${sanitizedData.message}`,
       );
     } catch (err) {
       console.error("Discord notification error:", err);
