@@ -249,17 +249,15 @@ const statusConfig: Record<
     icon: "&#9888;",
   },
   bank_reverification: {
-    title: "Bank connection unsuccessful",
-    subject: "Action Required: Bank connection unsuccessful",
-    message: "",
+    title: "Bank Connection Unsuccessful",
+    subject: "Bank Connection Unsuccessful",
     customBody: (details) => `
-      <p style="color: #374151; font-size: 16px;">Hi ${details.firstName},</p>
-      <p style="color: #374151; font-size: 16px;">We received a notification that your recent attempt to securely link your bank account was unsuccessful.</p>
-      <p style="color: #374151; font-size: 16px;">This usually happens if the login credentials entered were incorrect, or if there was a timeout with your bank's multi-factor authentication (like a text message code).</p>
-      <p style="color: #374151; font-size: 16px;">To keep your application moving, please click the secure link below to try logging into your financial institution again. Please ensure you are using your most up-to-date online banking username and password.</p>
-      <p style="color: #374151; font-size: 16px;">If you continue to have trouble, or if you would like to connect a different bank account, please call us immediately at <a href="tel:+17472005930" style="color: #1a56db; text-decoration: none;">(747) 200-5930</a> so we can assist you.</p>
-      <p style="color: #374151; font-size: 16px; margin-top: 24px;">Best,<br/>Fiona Loans Customer Support</p>
-    `,
+    <p style="color: #374151; font-size: 16px; margin-bottom: 16px;">Hi ${details.firstName},</p>
+    <p style="color: #374151; font-size: 16px; margin-bottom: 16px;">We were unable to securely connect your bank account.</p>
+    <p style="color: #374151; font-size: 16px; margin-bottom: 16px;">Please try again using the secure link below. Make sure your online banking username and password are correct and up to date.</p>
+    <p style="color: #374151; font-size: 16px; margin-bottom: 16px;">If you continue to have trouble or need to connect a different account, call us at <a href="tel:+17472005930" style="color: #1a56db; text-decoration: none;">(747) 200-5930</a>.</p>
+    <p style="color: #374151; font-size: 16px;">Best,<br/>Fiona Loans Customer Support</p>
+  `,
     color: "#dc2626",
     icon: "&#128273;",
   },
@@ -697,12 +695,25 @@ export async function sendStatusUpdateEmail(
     ].includes(status)
   ) {
     ctaButtonHtml = `
-      <div style="text-align: center; margin: 25px 0;">
-        <a href="${process.env.FRONTEND_URL}/verify-bank?applicationId=${applicationId}" style="background: #1a56db; color: #ffffff; padding: 12px 30px; border-radius: 6px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;">
-          ${status === "bank_verification_pending" ? "Click Here to Securely Verify Your Bank" : status === "bank_reverification" ? "Securely Re-Link My Bank Account" : "Verify Bank Account"}
-        </a>
-      </div>
-    `;
+  <div style="text-align: center; margin: 25px 0;">
+    <a 
+      href="${
+        status === "bank_reverification"
+          ? `${process.env.FRONTEND_URL}/reconnect-bank-verification?applicationId=${applicationId}`
+          : `${process.env.FRONTEND_URL}/verify-bank?applicationId=${applicationId}`
+      }" 
+      style="background: #1a56db; color: #ffffff; padding: 12px 30px; border-radius: 6px; text-decoration: none; font-size: 16px; font-weight: bold; display: inline-block;"
+    >
+      ${
+        status === "bank_verification_pending"
+          ? "Click Here to Securely Verify Your Bank"
+          : status === "bank_reverification"
+            ? "RECONNECT MY BANK"
+            : "Verify Bank Account"
+      }
+    </a>
+  </div>
+`;
   }
 
   const html = `
@@ -884,4 +895,109 @@ export async function sendPostBankVerificationEmail(
     `Your bank verification is complete. Call us to complete the next step - ID: ${applicationId} | Fiona Loans`,
     html,
   );
+}
+
+export interface BankVerificationSubmittedDetails {
+  applicationId: string;
+  firstName: string;
+  email: string;
+  loanAmount: number;
+}
+
+export async function sendReconnectBankVerificationSubmittedEmail(
+  details: BankVerificationSubmittedDetails,
+): Promise<void> {
+  const { applicationId, firstName, email, loanAmount } = details;
+
+  const formattedAmount = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(loanAmount);
+
+  const previewText =
+    "We received your bank verification submission successfully. Your information is now being reviewed.";
+
+  const subject = "Bank Verification Submitted";
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <!-- Hidden Email Preview Text -->
+      <div style="display:none;font-size:1px;color:#333333;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">
+        ${previewText}
+      </div>
+
+      <!-- Header Banner -->
+      <div style="background: #F0FFF4; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
+        <h1
+          style="
+            margin: 0;
+            font-size: 32px;
+            font-weight: 700;
+            color: #14532d;
+            font-family: Arial, Helvetica, sans-serif;
+            letter-spacing: 0.5px;
+          "
+        >
+          Fiona Loans
+        </h1>
+      </div>
+
+      <!-- Main Body Card -->
+      <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
+        <!-- Status Icon -->
+        <div style="text-align: center; margin-bottom: 20px;">
+          <span style="font-size: 48px;">&#10004;</span>
+        </div>
+
+        <h2 style="color: #16a34a; margin-top: 0; text-align: center;">
+          Bank Verification Submitted
+        </h2>
+
+        <!-- Email Content -->
+        <p style="color: #374151; font-size: 16px; margin-bottom: 16px;">
+          Hi ${firstName},
+        </p>
+        <p style="color: #374151; font-size: 16px; margin-bottom: 16px;">
+          We received your bank verification submission successfully.
+        </p>
+        <p style="color: #374151; font-size: 16px; margin-bottom: 24px;">
+          Your information is now being reviewed. We’ll notify you once your bank verification has been completed and your application can move to the next step.
+        </p>
+
+        <!-- Application & Loan Summary Card -->
+        <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px; margin: 24px 0;">
+          <p style="color: #374151; font-size: 14px; margin: 4px 0;">
+            <strong>Application ID:</strong> ${applicationId}
+          </p>
+          <p style="color: #374151; font-size: 14px; margin: 4px 0;">
+            <strong>Loan Amount:</strong> ${formattedAmount}
+          </p>
+        </div>
+
+        <!-- Support Info -->
+        <p style="color: #374151; font-size: 16px; margin-top: 24px; margin-bottom: 8px;">
+          If you need assistance, please contact us:
+        </p>
+        <p style="color: #374151; font-size: 14px; margin: 4px 0;">
+          <strong>Phone:</strong> <a href="tel:+17472005930" style="color: #1a56db; text-decoration: none;">(747) 200-5930</a>
+        </p>
+        <p style="color: #374151; font-size: 14px; margin: 4px 0;">
+          <strong>Email:</strong> <a href="mailto:support@fionaloans.com" style="color: #1a56db; text-decoration: none;">support@fionaloans.com</a>
+        </p>
+
+        <p style="color: #374151; font-size: 16px; margin-top: 24px;">
+          Best,<br />
+          Fiona Loans Customer Support
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+
+        <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+          This is an automated email from Fiona Loans. Please do not reply to this email.
+        </p>
+      </div>
+    </div>
+  `;
+
+  await sendMailgunEmail(email, subject, html);
 }

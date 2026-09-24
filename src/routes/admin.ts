@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+const PDFDocument = require("pdfkit");
 import { requireAuth, rateLimit, AuthRequest } from "../auth";
 import { transaction } from "../db";
 import {
@@ -1036,4 +1037,290 @@ router.get(
     }
   },
 );
+
+// GET /api/applications/:application_id/download-loan-agreement — Generate and download Loan Agreement PDF for a specific application
+router.get(
+  "/applications/:application_id/download-loan-agreement",
+  async (req: Request, res: Response) => {
+    try {
+      const application_id = req.params.application_id as string;
+      const data = await getApplicationById(application_id);
+
+      if (!data) {
+        return res.status(404).send("Application not found");
+      }
+
+      // --- 1. Derived Data & Calculations ---
+      const fullName =
+        [data.first_name, data.last_name].filter(Boolean).join(" ") ||
+        "Borrower";
+
+      const fullAddress =
+        [
+          data.street_address,
+          [data.city, data.state, data.zip_code].filter(Boolean).join(", "),
+          data.country,
+        ]
+          .filter(Boolean)
+          .join(" ") || "[Borrower Address]";
+
+      const createdDate = data.created_at
+        ? new Date(data.created_at).toLocaleDateString()
+        : new Date().toLocaleDateString();
+
+      // Loan metric estimates based on database fields
+      const principal = Number(data.loan_amount) || 0;
+      const termMonths = Number(data.loan_term) || 12;
+      const annualRate = 0.1; // 10% APR
+      const monthlyRate = annualRate / 12;
+
+      // Amortization calculation: M = P * [r(1+r)^n] / [(1+r)^n - 1]
+      let monthlyPayment = 0;
+      if (principal > 0) {
+        monthlyPayment =
+          (principal * (monthlyRate * Math.pow(1 + monthlyRate, termMonths))) /
+          (Math.pow(1 + monthlyRate, termMonths) - 1);
+      }
+      const totalRepayment = monthlyPayment * termMonths;
+
+      // First payment date set to ~30 days from creation
+      const firstPaymentDate = new Date(
+        new Date(createdDate).getTime() + 30 * 24 * 60 * 60 * 1000,
+      ).toLocaleDateString();
+
+      // --- 2. Configure Express Response Headers ---
+      const filename = `${fullName.replace(/\s+/g, "_")}_LOAN_AGREEMENT.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${filename}"`,
+      );
+
+      // --- 3. Initialize & Stream PDF ---
+      const doc = new PDFDocument({ margin: 50 });
+      doc.pipe(res);
+
+      // Document Title
+      doc
+        .fontSize(18)
+        .font("Helvetica-Bold")
+        .text("LOAN AGREEMENT", { align: "center" })
+        .moveDown(1.5);
+
+      doc
+        .fontSize(10)
+        .font("Helvetica")
+        .text(`Date: ${createdDate}`)
+        .moveDown(1);
+
+      // Lender & Borrower Side-by-Side Block
+      const metadataTopY = doc.y;
+      const leftColX = 50;
+      const rightColX = 300;
+      const columnWidth = 230;
+
+      // Left Column: Lender
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(10)
+        .text("Lender:", leftColX, metadataTopY, { width: columnWidth });
+      doc
+        .font("Helvetica")
+        .text("Fiona Loans", { width: columnWidth })
+        .text("22632 Golden Springs Dr Suite 315, Diamond Bar, CA 91765", {
+          width: columnWidth,
+        })
+        .text("Contact: (747) 200-5930", { width: columnWidth })
+        .text("Email: support@fionaloans.com", { width: columnWidth });
+
+      const lenderBottomY = doc.y; // Record end position of left column
+
+      // Right Column: Borrower
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(10)
+        .text("Borrower:", rightColX, metadataTopY, { width: columnWidth });
+      doc
+        .font("Helvetica")
+        .text(`Name: ${fullName}`, { width: columnWidth })
+        .text(`Address: ${fullAddress}`, { width: columnWidth })
+        .text(
+          `Contact: ${data.phone || data.email || "[Borrower Contact Info]"}`,
+          {
+            width: columnWidth,
+          },
+        );
+
+      const borrowerBottomY = doc.y; // Record end position of right column
+
+      // Reset vertical position to below whichever column is taller
+      doc.y = Math.max(lenderBottomY, borrowerBottomY) + 15;
+      doc.x = leftColX; // Reset X coordinate back to left margin
+
+      doc.moveDown(2);
+      doc.x = 50; // Reset X margin
+
+      // Section 1: Loan Details
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .text("1. Loan Details")
+        .moveDown(0.5);
+      doc.font("Helvetica").fontSize(10);
+      doc.text(`• Loan Amount: $${principal.toFixed(2)}`);
+      doc.text("• APR: 10%");
+      doc.text("• Payment Frequency: Monthly");
+      doc.text(`• Loan Purpose: ${data.loan_purpose || "Personal"}`);
+      doc.text("• Collateral: Unsecured").moveDown(1);
+
+      // Section 2: Disbursement & Verification
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .text("2. Disbursement & Verification")
+        .moveDown(0.5);
+      doc.font("Helvetica").fontSize(10);
+      doc.text(
+        "Lender agrees to disburse the Loan amount after successful verification. Borrower shall provide banking info for a verification deposit of $1,000+.",
+      );
+      doc.text(
+        "a) Lender deposits the verification amount into Borrower’s account.",
+      );
+      doc.text("b) Borrower confirms receipt and the exact deposit amount.");
+      doc.text(
+        "c) Borrower agrees to return the verification funds via Cash App, Apple Pay, or in person at a retail store within a timeframe specified by the Lender.",
+      );
+      doc.text(
+        "d) Multiple deposits (up to 3) may be required; Borrower agrees to this process.",
+      );
+      doc
+        .text(
+          "e) Once the verification funds are returned in full and complete, the entire Loan amount will be disbursed.",
+        )
+        .moveDown(1);
+
+      // Section 3: Conditions & Use
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .text("3. Conditions & Use")
+        .moveDown(0.5);
+      doc.font("Helvetica").fontSize(10);
+      doc.text("• No collateral required; the Loan is unsecured.");
+      doc.text(
+        "• The Borrower agrees to use funds solely for lawful purposes.",
+      );
+      doc
+        .text(
+          "• Loan disbursement is contingent upon successful verification and documentation.",
+        )
+        .moveDown(1);
+
+      // Section 4: Repayment & Fees
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .text("4. Repayment & Fees")
+        .moveDown(0.5);
+      doc.font("Helvetica").fontSize(10);
+      doc.text(`• Payments are due monthly starting from ${firstPaymentDate}.`);
+      doc.text(`• Payment amount: $${monthlyPayment.toFixed(2)}.`);
+      doc.text("• Payments are to be made via the designated account.");
+      doc.text("• Early repayment is allowed without penalty.");
+      doc.text(
+        "• Interest rate: 10% annually, calculated on the outstanding balance.",
+      );
+      doc.text(`• Total repayment: $${totalRepayment.toFixed(2)}.`).moveDown(1);
+
+      // Section 5: Default & Remedies
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .text("5. Default & Remedies")
+        .moveDown(0.5);
+      doc.font("Helvetica").fontSize(10);
+      doc.text("• Default occurs if payments are missed or terms breached.");
+      doc
+        .text(
+          "• Remedies include acceleration of the remaining balance, legal actions, and collection costs.",
+        )
+        .moveDown(1);
+
+      // Section 6: Cancellation & Fees
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .text("6. Cancellation & Fees")
+        .moveDown(0.5);
+      doc.font("Helvetica").fontSize(10);
+      doc.text(
+        "• Cancellation after signing incurs a fee of $499 plus $99 admin fee.",
+      );
+      doc
+        .text(
+          "• No refunds of deposits or fees paid if canceled, unless explicitly stated.",
+        )
+        .moveDown(1);
+
+      // Section 7: Miscellaneous
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .text("7. Miscellaneous")
+        .moveDown(0.5);
+      doc.font("Helvetica").fontSize(10);
+      doc.text("• Governed by laws of California.");
+      doc.text("• Confidentiality applies unless legally required.");
+      doc.text("• No assignment without prior consent.");
+      doc.text("• If any provision is invalid, others remain in effect.");
+      doc.text("• Amendments must be written and signed.").moveDown(1);
+
+      // Additional Terms
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .text("Additional Terms:")
+        .moveDown(0.5);
+      doc.font("Helvetica").fontSize(10);
+      doc.text(
+        "• The verification deposit may be repeated 2 or 3 times as needed, with Borrower’s agreement.",
+      );
+      doc.text(
+        "• Borrower must return verification funds via specified methods.",
+      );
+      doc
+        .text(
+          "• Signing confirms understanding of repayment schedule, cancellation fees, and verification process.",
+        )
+        .moveDown(2);
+
+      // Signatures
+      doc.font("Helvetica-Bold").fontSize(11).text("Signatures").moveDown(1);
+
+      const signatureY = doc.y;
+
+      doc.font("Helvetica").fontSize(10);
+      doc.text("Lender: _______________________", 50, signatureY);
+      doc.text("Name: Albert Howard", 50, signatureY + 15);
+
+      doc.text("Borrower: _____________________", 320, signatureY);
+      doc.text(`Name: ${fullName}`, 320, signatureY + 15);
+
+      doc.moveDown(3);
+      doc.x = 50;
+      doc
+        .font("Helvetica-Oblique")
+        .fontSize(9)
+        .text(
+          "Acknowledgment:\nBy signing, Borrower agrees to the terms, including the verification process, repayment schedule, and cancellation fees.",
+        );
+
+      doc.end();
+    } catch (error) {
+      console.error("PDF Generation Error:", error);
+      res.status(500).send("Error generating agreement PDF");
+    }
+  },
+);
+
 export default router;
